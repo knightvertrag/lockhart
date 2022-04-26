@@ -1,10 +1,16 @@
-type TokenType = String;
+type TokenType= &'static str;
 
+#[derive(PartialEq, Debug)]
 pub struct Token {
-    pub _type: TokenType,
+    pub type_: TokenType,
     pub literal: String,
 }
 
+impl Token {
+    pub fn new(type_: TokenType, literal: String) -> Token {
+        Token { type_, literal }
+    }
+}
 // identifiers + literals
 pub const IDENT: &'static str = "IDENT"; //foobar, x, y.....
 pub const NUM: &'static str = "NUM"; // 123456....
@@ -26,5 +32,8 @@ pub const RBRACE: &'static str = "}";
 pub const FUNCTION: &'static str = "FUNCTION";
 pub const LET: &'static str = "LET";
 
+// SPECIAL
+pub const EOF: &'static str = "EOF";
+pub const ILLEGAL: &'static str = "ILLEGAL";
 
 
