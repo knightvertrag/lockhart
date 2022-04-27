@@ -1,4 +1,4 @@
-use crate::token::{self, Token};
+use crate::token;
 
 pub struct Lexer {
     input: String,
@@ -35,19 +35,27 @@ impl Lexer {
         ch.is_ascii_alphabetic() || ch == '_' as u8
     }
 
+    fn is_number(ch: u8) -> bool {
+        ch.is_ascii_digit()
+    }
+
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
         }
     }
 
-    fn read_identifier(&mut self) -> String {
+    /// can read both identifiers and numbers based on f
+    /// ## Arguments
+    /// * `f` - checker function for digit or alphabet
+    fn read_identifier(&mut self, f: fn(u8) -> bool) -> String {
         let position = self.position;
-        while Self::is_letter(self.ch) {
+        while f(self.ch) {
             self.read_char();
         }
         self.input[position..self.position].to_string()
     }
+    
     fn next_token(&mut self) -> token::Token {
         self.skip_whitespace();
         let res: token::Token;
@@ -80,10 +88,14 @@ impl Lexer {
                 res = token::Token::new(token::EOF, "\0".to_string());
             }
             _ => {
-                if Self::is_letter(self.ch) {
-                    let literal = Lexer::read_identifier(self);
+                if Lexer::is_letter(self.ch) {
+                    let literal = Lexer::read_identifier(self, Lexer::is_letter);
                     let tok = token::Token::check_keyword(&literal);
                     res = token::Token::new(tok, literal);
+                    return res;
+                } else if Lexer::is_number(self.ch) {
+                    let literal = Lexer::read_identifier(self, Lexer::is_number);
+                    res = token::Token::new(token::NUM, literal);
                     return res;
                 } else {
                     res = token::Token::new(token::ILLEGAL, self.ch.to_string());
@@ -117,8 +129,14 @@ mod tests {
             type_: super::token::ASSIGN,
             literal: "=".to_string(),
         };
+        let rhs3 = lexer.next_token();
+        let lhs3 = super::token::Token {
+            type_: super::token::NUM,
+            literal: "10".to_string(),
+        };
         assert_eq!(lhs, rhs);
         assert_eq!(lhs1, rhs1);
         assert_eq!(lhs2, rhs2);
+        assert_eq!(lhs3, rhs3);
     }
 }

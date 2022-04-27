@@ -49,6 +49,7 @@ pub const ILLEGAL: &'static str = "ILLEGAL";
 // pub enum Keywords {
 //     Let(&'static str),
 //     Fn(&'static str)
+//     .....
 // }
 
 pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
