@@ -1,6 +1,54 @@
 use phf::phf_map;
 
-pub type TokenType = &'static str;
+// pub type TokenType = &'static str;
+#[derive(PartialEq, Clone, Debug)]
+pub enum TokenType {
+    IDENT(Ident),
+    NUM(Num),
+    KEYWORDS(Keywords),
+    OPERATORS(Operators),
+    DELIMITERS(Delimiters),
+    ILLEGAL
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Ident {
+    IDENT,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Num {
+    NUM,
+}
+#[derive(PartialEq, Clone, Debug)]
+pub enum Delimiters {
+    COMMA,
+    SEMICOLON,
+    LBRACE,
+    RBRACE,
+    LPAREN,
+    RPAREN
+}
+#[derive(PartialEq, Clone, Debug)]
+pub enum Keywords {
+    LET,
+    FUNCTION,
+    IF,
+    ELSE,
+    RETURN,
+    TRUE,
+    FALSE
+}
+#[derive(PartialEq, Clone, Debug)]
+pub enum Operators {
+    ASSIGN,
+    GT,
+    LT,
+    GEQ,
+    LEQ,
+    EQ,
+    NEQ
+}
 
 #[derive(PartialEq, Debug)]
 pub struct Token {
@@ -17,42 +65,30 @@ impl Token {
         if let Some(key) = KEYWORDS.get(ident).cloned() {
             return key;
         }
-        IDENT
+        TokenType::IDENT(Ident::IDENT)
     }
 }
-// identifiers + literals
-pub const IDENT: &'static str = "IDENT"; //foobar, x, y.....
-pub const NUM: &'static str = "NUM"; // 123456....
-
-// Operators
-pub const ASSIGN: &'static str = "=";
-pub const PLUS: &'static str = "+";
-
-// Delimiters
-pub const COMMA: &'static str = ",";
-pub const SEMICOLON: &'static str = ";";
-
-pub const LPAREN: &'static str = "(";
-pub const RPAREN: &'static str = ")";
-pub const LBRACE: &'static str = "{";
-pub const RBRACE: &'static str = "}";
-
-// Keywords
-pub const FUNCTION: &'static str = "FUNCTION";
-pub const LET: &'static str = "LET";
-
-// SPECIAL
-pub const EOF: &'static str = "EOF";
-pub const ILLEGAL: &'static str = "ILLEGAL";
-
-// TODO: Probably change this entire thing to an enum
-// pub enum Keywords {
-//     Let(&'static str),
-//     Fn(&'static str)
-//     .....
-// }
 
 pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
-    "let" => LET,
-    "fn" => FUNCTION
+    "let" => TokenType::KEYWORDS(Keywords::LET),
+    "fn" => TokenType::KEYWORDS(Keywords::FUNCTION)
+};
+
+pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! {
+    "=" => TokenType::OPERATORS(Operators::ASSIGN),
+    "<" => TokenType::OPERATORS(Operators::LT),
+    ">" => TokenType::OPERATORS(Operators::GT),
+    "==" => TokenType::OPERATORS(Operators::EQ),
+    "!=" => TokenType::OPERATORS(Operators::NEQ),
+    ">=" => TokenType::OPERATORS(Operators::GEQ),
+    "<=" => TokenType::OPERATORS(Operators::LEQ)
+};
+
+pub static DELIMITERS: phf::Map<&'static str, TokenType> = phf_map! {
+    "{" => TokenType::DELIMITERS(Delimiters::LBRACE),
+    "}" => TokenType::DELIMITERS(Delimiters::RBRACE),
+    "(" => TokenType::DELIMITERS(Delimiters::LPAREN),
+    ")" => TokenType::DELIMITERS(Delimiters::RPAREN),
+    "," => TokenType::DELIMITERS(Delimiters::COMMA),
+    ";" => TokenType::DELIMITERS(Delimiters::SEMICOLON)
 };
