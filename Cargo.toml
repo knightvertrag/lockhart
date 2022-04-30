@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 phf = { version = "0.10.1", features = ["macros"] }
+rustyline = "9.1.2"
