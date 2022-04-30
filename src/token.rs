@@ -72,7 +72,12 @@ impl Token {
 
 pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "let" => TokenType::KEYWORDS(Keywords::LET),
-    "fn" => TokenType::KEYWORDS(Keywords::FUNCTION)
+    "fn" => TokenType::KEYWORDS(Keywords::FUNCTION),
+    "true" => TokenType::KEYWORDS(Keywords::TRUE),
+    "false" => TokenType::KEYWORDS(Keywords::FALSE),
+    "return" => TokenType::KEYWORDS(Keywords::RETURN),
+    "if" => TokenType::KEYWORDS(Keywords::IF),
+    "else" => TokenType::KEYWORDS(Keywords::ELSE)
 };
 
 pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! {
