@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::token::{self, Num};
+use crate::token::{self, Num, Token};
 use crate::token::{Operators, TokenType};
 mod tests;
 pub struct Lexer {
@@ -11,7 +11,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    fn new(input: String) -> Lexer {
+    pub fn new(input: String) -> Lexer {
         let mut l = Lexer {
             input,
             position: 0,
@@ -23,7 +23,7 @@ impl Lexer {
     }
 
     fn read_char(&mut self) {
-        if self.read_position > self.input.len().try_into().unwrap() {
+        if self.read_position >= self.input.len() {
             self.ch = 0;
         } else {
             let inp = self.input.as_bytes();
@@ -43,7 +43,7 @@ impl Lexer {
     }
 
     fn peek_ahead(&self) -> Option<u8> {
-        if self.read_position >= self.input.len().try_into().unwrap() {
+        if self.read_position >= self.input.len() {
             return None;
         }
         Some(self.input.as_bytes()[self.read_position])
@@ -65,32 +65,36 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
 
-    fn next_token(&mut self) -> token::Token {
+    pub fn next_token(&mut self) -> token::Token {
         let selfcell = RefCell::new(self);
         selfcell.borrow_mut().skip_whitespace();
         let mut res = token::Token::new(TokenType::ILLEGAL, "".to_string());
 
-        let mut build_double = |tok, next_ch: char, lit: &str| {
-            if selfcell.borrow().peek_ahead() == Some(next_ch as u8) {
-                res = token::Token::new(tok, lit.to_string());
-                selfcell.borrow_mut().read_char();
-            }
-        };
-
         let current_char = (selfcell.borrow().ch as char).to_string();
         if let Some(tok) = token::OPERATORS.get(&current_char) {
+            let mut build_double = |t, next_ch: char, lit: &str| {
+                if selfcell.borrow().peek_ahead() == Some(next_ch as u8) {
+                    let mut literal = lit.to_string();
+                    literal.push(next_ch);
+                    res = token::Token::new(t, literal);
+                    selfcell.borrow_mut().read_char();
+                }
+                else {
+                    res = Token::new(tok.clone(), lit.to_string());
+                }
+            };
             match tok {
                 TokenType::OPERATORS(Operators::ASSIGN) => {
-                    build_double(TokenType::OPERATORS(Operators::EQ), '=', "==");
+                    build_double(TokenType::OPERATORS(Operators::EQ), '=', "=");
                 }
                 TokenType::OPERATORS(Operators::GT) => {
-                    build_double(TokenType::OPERATORS(Operators::GEQ), '=', ">=");
+                    build_double(TokenType::OPERATORS(Operators::GEQ), '=', ">");
                 }
                 TokenType::OPERATORS(Operators::LT) => {
-                    build_double(TokenType::OPERATORS(Operators::LEQ), '=', "<=");
+                    build_double(TokenType::OPERATORS(Operators::LEQ), '=', "<");
                 }
                 TokenType::OPERATORS(Operators::NOT) => {
-                    build_double(TokenType::OPERATORS(Operators::NEQ), '=', "!=");
+                    build_double(TokenType::OPERATORS(Operators::NEQ), '=', "!");
                 }
                 _ => {
                     res = token::Token::new(tok.clone(), current_char);
@@ -115,5 +119,16 @@ impl Lexer {
 
         selfcell.borrow_mut().read_char();
         res
+    }
+}
+
+impl Iterator for Lexer {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.read_position > self.input.len() {
+            return None;
+        }
+        Some(self.next_token())
     }
 }
