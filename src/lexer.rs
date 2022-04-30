@@ -64,14 +64,14 @@ impl Lexer {
         }
         self.input[position..self.position].to_string()
     }
-    
+
     fn next_token(&mut self) -> token::Token {
         let selfcell = RefCell::new(self);
         selfcell.borrow_mut().skip_whitespace();
-        let mut res= token::Token::new(TokenType::ILLEGAL, "".to_string());
+        let mut res = token::Token::new(TokenType::ILLEGAL, "".to_string());
 
-        let mut build_double = | tok, ch: char, lit: &str| {
-            if selfcell.borrow().peek_ahead() == Some(ch as u8) {
+        let mut build_double = |tok, next_ch: char, lit: &str| {
+            if selfcell.borrow().peek_ahead() == Some(next_ch as u8) {
                 res = token::Token::new(tok, lit.to_string());
                 selfcell.borrow_mut().read_char();
             }
@@ -85,6 +85,12 @@ impl Lexer {
                 }
                 TokenType::OPERATORS(Operators::GT) => {
                     build_double(TokenType::OPERATORS(Operators::GEQ), '=', ">=");
+                }
+                TokenType::OPERATORS(Operators::LT) => {
+                    build_double(TokenType::OPERATORS(Operators::LEQ), '=', "<=");
+                }
+                TokenType::OPERATORS(Operators::NOT) => {
+                    build_double(TokenType::OPERATORS(Operators::NEQ), '=', "!=");
                 }
                 _ => {
                     res = token::Token::new(tok.clone(), current_char);

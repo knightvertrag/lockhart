@@ -42,6 +42,7 @@ pub enum Keywords {
 #[derive(PartialEq, Clone, Debug)]
 pub enum Operators {
     ASSIGN,
+    NOT,
     GT,
     LT,
     GEQ,
@@ -76,6 +77,7 @@ pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
 
 pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! {
     "=" => TokenType::OPERATORS(Operators::ASSIGN),
+    "!" => TokenType::OPERATORS(Operators::NOT),
     "<" => TokenType::OPERATORS(Operators::LT),
     ">" => TokenType::OPERATORS(Operators::GT),
     "==" => TokenType::OPERATORS(Operators::EQ),
