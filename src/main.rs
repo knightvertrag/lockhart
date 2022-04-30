@@ -1,5 +1,10 @@
+use std::io;
 mod lexer;
+mod repl;
 mod token;
-fn main() {
-    println!("Hello, Compiler!");
+fn main() -> io::Result<()> {
+    println!("Hello, Coompiler!");
+    repl::start();
+
+    Ok(())
 }
