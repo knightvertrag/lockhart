@@ -4,7 +4,7 @@ use crate::token::{Ident, Keywords, Num, Operators};
 
 #[test]
 fn test_token_next() {
-    let input = "fn x = 10;";
+    let input = "fn x >= 10;";
     let mut lexer = super::Lexer::new(String::from(input));
     let rhs = lexer.next_token();
     let lhs = super::token::Token {
@@ -18,8 +18,8 @@ fn test_token_next() {
     };
     let rhs2 = lexer.next_token();
     let lhs2 = super::token::Token {
-        type_: super::token::TokenType::OPERATORS(Operators::ASSIGN),
-        literal: "=".to_string(),
+        type_: super::token::TokenType::OPERATORS(Operators::GEQ),
+        literal: ">=".to_string(),
     };
     let rhs3 = lexer.next_token();
     let lhs3 = super::token::Token {

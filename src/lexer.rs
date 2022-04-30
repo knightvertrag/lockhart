@@ -1,5 +1,7 @@
-use crate::token::TokenType;
+use std::cell::RefCell;
+
 use crate::token::{self, Num};
+use crate::token::{Operators, TokenType};
 mod tests;
 pub struct Lexer {
     input: String,
@@ -40,6 +42,12 @@ impl Lexer {
         ch.is_ascii_digit()
     }
 
+    fn peek_ahead(&self) -> Option<u8> {
+        if self.read_position >= self.input.len().try_into().unwrap() {
+            return None;
+        }
+        Some(self.input.as_bytes()[self.read_position])
+    }
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
@@ -56,23 +64,42 @@ impl Lexer {
         }
         self.input[position..self.position].to_string()
     }
-
+    
     fn next_token(&mut self) -> token::Token {
-        self.skip_whitespace();
-        let res: token::Token;
-        let current_char = (self.ch as char).to_string();
+        let selfcell = RefCell::new(self);
+        selfcell.borrow_mut().skip_whitespace();
+        let mut res= token::Token::new(TokenType::ILLEGAL, "".to_string());
+
+        let mut build_double = | tok, ch: char, lit: &str| {
+            if selfcell.borrow().peek_ahead() == Some(ch as u8) {
+                res = token::Token::new(tok, lit.to_string());
+                selfcell.borrow_mut().read_char();
+            }
+        };
+
+        let current_char = (selfcell.borrow().ch as char).to_string();
         if let Some(tok) = token::OPERATORS.get(&current_char) {
-            res = token::Token::new(tok.clone(), current_char);
+            match tok {
+                TokenType::OPERATORS(Operators::ASSIGN) => {
+                    build_double(TokenType::OPERATORS(Operators::EQ), '=', "==");
+                }
+                TokenType::OPERATORS(Operators::GT) => {
+                    build_double(TokenType::OPERATORS(Operators::GEQ), '=', ">=");
+                }
+                _ => {
+                    res = token::Token::new(tok.clone(), current_char);
+                }
+            }
         } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
             res = token::Token::new(tok.clone(), current_char);
         } else {
-            if Lexer::is_letter(self.ch) {
-                let literal = Lexer::read_identifier(self, Lexer::is_letter);
+            if Lexer::is_letter(selfcell.borrow().ch) {
+                let literal = Lexer::read_identifier(*selfcell.borrow_mut(), Lexer::is_letter);
                 let tok = token::Token::check_keyword(&literal);
                 res = token::Token::new(tok, literal);
                 return res;
-            } else if Lexer::is_number(self.ch) {
-                let literal = Lexer::read_identifier(self, Lexer::is_number);
+            } else if Lexer::is_number(selfcell.borrow().ch) {
+                let literal = Lexer::read_identifier(*selfcell.borrow_mut(), Lexer::is_number);
                 res = token::Token::new(TokenType::NUM(Num::NUM), literal);
                 return res;
             } else {
@@ -80,8 +107,7 @@ impl Lexer {
             }
         }
 
-        self.read_char();
+        selfcell.borrow_mut().read_char();
         res
     }
 }
-
