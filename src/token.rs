@@ -48,7 +48,11 @@ pub enum Operators {
     GEQ,
     LEQ,
     EQ,
-    NEQ
+    NEQ,
+    PLUS,
+    MINUS,
+    MUL,
+    DIV
 }
 
 #[derive(PartialEq, Debug)]
@@ -88,7 +92,11 @@ pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! {
     "==" => TokenType::OPERATORS(Operators::EQ),
     "!=" => TokenType::OPERATORS(Operators::NEQ),
     ">=" => TokenType::OPERATORS(Operators::GEQ),
-    "<=" => TokenType::OPERATORS(Operators::LEQ)
+    "<=" => TokenType::OPERATORS(Operators::LEQ),
+    "+" => TokenType::OPERATORS(Operators::PLUS),
+    "-" => TokenType::OPERATORS(Operators::MINUS),
+    "*" => TokenType::OPERATORS(Operators::MUL),
+    "/" => TokenType::OPERATORS(Operators::DIV),
 };
 
 pub static DELIMITERS: phf::Map<&'static str, TokenType> = phf_map! {

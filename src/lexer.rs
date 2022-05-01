@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use crate::token::{self, Num, Token};
 use crate::token::{Operators, TokenType};
 mod tests;
+#[derive(Debug)]
 pub struct Lexer {
     input: String,
     position: usize,
