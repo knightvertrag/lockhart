@@ -1,6 +1,5 @@
 use phf::phf_map;
 
-// pub type TokenType = &'static str;
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokenType {
     IDENT(Ident),
@@ -8,7 +7,8 @@ pub enum TokenType {
     KEYWORDS(Keywords),
     OPERATORS(Operators),
     DELIMITERS(Delimiters),
-    ILLEGAL
+    ILLEGAL,
+    EOF,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -27,7 +27,7 @@ pub enum Delimiters {
     LBRACE,
     RBRACE,
     LPAREN,
-    RPAREN
+    RPAREN,
 }
 #[derive(PartialEq, Clone, Debug)]
 pub enum Keywords {
@@ -37,7 +37,7 @@ pub enum Keywords {
     ELSE,
     RETURN,
     TRUE,
-    FALSE
+    FALSE,
 }
 #[derive(PartialEq, Clone, Debug)]
 pub enum Operators {
@@ -52,10 +52,10 @@ pub enum Operators {
     PLUS,
     MINUS,
     MUL,
-    DIV
+    DIV,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
     pub literal: String,
@@ -64,6 +64,10 @@ pub struct Token {
 impl Token {
     pub fn new(type_: TokenType, literal: String) -> Token {
         Token { type_, literal }
+    }
+
+    pub fn new_def() -> Token {
+        Token {type_: TokenType::ILLEGAL, literal: "".to_string()}
     }
 
     pub fn check_keyword(ident: &String) -> TokenType {

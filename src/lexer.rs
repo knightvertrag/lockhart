@@ -49,6 +49,7 @@ impl Lexer {
         }
         Some(self.input.as_bytes()[self.read_position])
     }
+
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
@@ -66,10 +67,10 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
 
-    pub fn next_token(&mut self) -> token::Token {
+    pub fn next_token(&mut self) -> Token {
         let selfcell = RefCell::new(self);
         selfcell.borrow_mut().skip_whitespace();
-        let mut res = token::Token::new(TokenType::ILLEGAL, "".to_string());
+        let mut res = Token::new(TokenType::ILLEGAL, "".to_string());
 
         let current_char = (selfcell.borrow().ch as char).to_string();
         if let Some(tok) = token::OPERATORS.get(&current_char) {
@@ -77,13 +78,13 @@ impl Lexer {
                 if selfcell.borrow().peek_ahead() == Some(next_ch as u8) {
                     let mut literal = lit.to_string();
                     literal.push(next_ch);
-                    res = token::Token::new(t, literal);
+                    res = Token::new(t, literal);
                     selfcell.borrow_mut().read_char();
-                }
-                else {
+                } else {
                     res = Token::new(tok.clone(), lit.to_string());
                 }
             };
+
             match tok {
                 TokenType::OPERATORS(Operators::ASSIGN) => {
                     build_double(TokenType::OPERATORS(Operators::EQ), '=', "=");
@@ -98,23 +99,23 @@ impl Lexer {
                     build_double(TokenType::OPERATORS(Operators::NEQ), '=', "!");
                 }
                 _ => {
-                    res = token::Token::new(tok.clone(), current_char);
+                    res = Token::new(tok.clone(), current_char);
                 }
             }
         } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
-            res = token::Token::new(tok.clone(), current_char);
+            res = Token::new(tok.clone(), current_char);
         } else {
             if Lexer::is_letter(selfcell.borrow().ch) {
                 let literal = Lexer::read_identifier(*selfcell.borrow_mut(), Lexer::is_letter);
-                let tok = token::Token::check_keyword(&literal);
-                res = token::Token::new(tok, literal);
+                let tok = Token::check_keyword(&literal);
+                res = Token::new(tok, literal);
                 return res;
             } else if Lexer::is_number(selfcell.borrow().ch) {
                 let literal = Lexer::read_identifier(*selfcell.borrow_mut(), Lexer::is_number);
-                res = token::Token::new(TokenType::NUM(Num::NUM), literal);
+                res = Token::new(TokenType::NUM(Num::NUM), literal);
                 return res;
             } else {
-                res = token::Token::new(TokenType::ILLEGAL, "".to_string());
+                res = Token::new(TokenType::ILLEGAL, "".to_string());
             }
         }
 

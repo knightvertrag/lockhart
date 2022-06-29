@@ -13,7 +13,7 @@ pub fn start() {
             Err(ReadlineError::Eof) => break,
             Err(err) => {
                 panic!("{}", err);
-            },
+            }
         }
     }
 }

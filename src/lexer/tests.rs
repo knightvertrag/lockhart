@@ -26,7 +26,7 @@ fn test_token_next() {
         type_: super::token::TokenType::NUM(Num::NUM),
         literal: "10".to_string(),
     };
-    
+
     assert_eq!(lhs, rhs);
     assert_eq!(lhs1, rhs1);
     assert_eq!(lhs2, rhs2);
