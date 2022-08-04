@@ -4,6 +4,7 @@ use phf::phf_map;
 pub enum TokenType {
     IDENT(Ident),
     NUM(Num),
+    LITERAL,
     KEYWORDS(Keywords),
     OPERATORS(Operators),
     DELIMITERS(Delimiters),

@@ -67,6 +67,14 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
 
+    fn read_literal(&mut self) -> String {
+        self.read_char();
+        let position = self.position;
+        while self.ch as char != '\"' {
+            self.read_char();
+        }
+        self.input[position..self.position].to_string()
+    }
     pub fn next_token(&mut self) -> Token {
         let selfcell = RefCell::new(self);
         selfcell.borrow_mut().skip_whitespace();
@@ -102,15 +110,18 @@ impl Lexer {
                     res = Token::new(tok.clone(), current_char);
                 }
             }
-        } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
+        } else if current_char == "\""{ // string literal
+            let literal = Lexer::read_literal(*selfcell.borrow_mut());
+            res = Token::new(TokenType::LITERAL, literal)
+        } else if let Some(tok) = token::DELIMITERS.get(&current_char) { // delimiter
             res = Token::new(tok.clone(), current_char);
         } else {
-            if Lexer::is_letter(selfcell.borrow().ch) {
+            if Lexer::is_letter(selfcell.borrow().ch) { // identifier
                 let literal = Lexer::read_identifier(*selfcell.borrow_mut(), Lexer::is_letter);
                 let tok = Token::check_keyword(&literal);
                 res = Token::new(tok, literal);
                 return res;
-            } else if Lexer::is_number(selfcell.borrow().ch) {
+            } else if Lexer::is_number(selfcell.borrow().ch) { // number literal
                 let literal = Lexer::read_identifier(*selfcell.borrow_mut(), Lexer::is_number);
                 res = Token::new(TokenType::NUM(Num::NUM), literal);
                 return res;
