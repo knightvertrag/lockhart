@@ -14,12 +14,16 @@ pub struct Vm {
 macro_rules! binary_op {
     ($op: tt, $x: ident) => {
         {
-            let left = $x.stack.pop().unwrap();
             let right = $x.stack.pop().unwrap();
+            let left = $x.stack.pop().unwrap();
             if let Value::NUMBER(x) = left {
                 if let Value::NUMBER(y) = right {
                     $x.stack.push(Value::NUMBER(x $op y));
+                } else {
+                    panic!("Expected Type Number");
                 }
+            } else {
+                panic!("Expected Type Number");
             }
         }
     }
@@ -79,11 +83,24 @@ impl Vm {
                     }
                     Opcode::OPADD => {
                         binary_op!(+, self);
+                        println!("{:?}", self.peek());
+                    }
+                    Opcode::OPSUBSTRACT => {
+                        binary_op!(-, self);
+                        println!("{:?}", self.peek());
+                    }
+                    Opcode::OPDIVIDE => {
+                        binary_op!(/, self);
+                        println!("{:?}", self.peek());
+                    }
+                    Opcode::OPMULTIPLY => {
+                        binary_op!(*, self);
                         println!("{:?}", self.peek())
                     }
-                    Opcode::OPSUBSTRACT => {}
-                    Opcode::OPDIVIDE => {}
-                    Opcode::OPMULTIPLY => {}
+                    Opcode::OPMOD => {
+                        binary_op!(%, self);
+                        println!("{:?}", self.peek())
+                    }
                 }
             }
         }
