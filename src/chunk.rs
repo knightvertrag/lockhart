@@ -1,6 +1,6 @@
 use crate::bytecode::Opcode;
 
-#[derive(Debug, Clone)]
+#[derive(Debug,Clone)]
 pub enum Constant {
     DOUBLE(f64),
     STRING(String),
