@@ -9,6 +9,7 @@ pub struct Lexer {
     position: usize,
     read_position: usize,
     ch: u8,
+    lineno: u8,
 }
 
 impl Lexer {
@@ -18,6 +19,7 @@ impl Lexer {
             position: 0,
             read_position: 0,
             ch: 0,
+            lineno: 1
         };
         l.read_char();
         l
@@ -29,6 +31,9 @@ impl Lexer {
         } else {
             let inp = self.input.as_bytes();
             self.ch = inp[self.read_position];
+            if self.ch as char == '\n' {
+                self.lineno += 1;
+            }
         }
 
         self.position = self.read_position;
