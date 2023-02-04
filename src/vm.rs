@@ -16,14 +16,10 @@ macro_rules! binary_op {
         {
             let right = $x.stack.pop().unwrap();
             let left = $x.stack.pop().unwrap();
-            if let Value::NUMBER(x) = left {
-                if let Value::NUMBER(y) = right {
-                    $x.stack.push(Value::NUMBER(x $op y));
-                } else {
-                    panic!("Expected Type Number");
-                }
+            if let (Value::NUMBER(x), Value::NUMBER(y)) = (left, right) {
+                $x.stack.push((Value::NUMBER(x $op y)));
             } else {
-                panic!("Expected Type Number");
+                panic!("Expected type number");
             }
         }
     }
@@ -109,11 +105,6 @@ impl Vm {
     fn peek(&self) -> Value {
         return self.stack[self.stack.len() - 1].clone();
     }
-    // fn binary_op(&mut self) -> Value {
-    //     let left = self.stack.pop().unwrap();
-    //     let right = self.stack.pop().unwrap();
-
-    // }
     fn read_constant(&self, idx: usize) -> Value {
         let constant = self.chunk.constants[idx].clone();
         match constant {
