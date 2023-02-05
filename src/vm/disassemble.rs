@@ -9,6 +9,11 @@ pub fn disassemble_code(chunk: Chunk) {
             Opcode::OPRETURN => {}
             Opcode::OPCONSTANT(_) => {},
             Opcode::OPNEGATE => {}
+            Opcode::OPADD => todo!(),
+            Opcode::OPSUBSTRACT => todo!(),
+            Opcode::OPMULTIPLY => todo!(),
+            Opcode::OPDIVIDE => todo!(),
+            Opcode::OPMOD => todo!(),
         }
     }
 }

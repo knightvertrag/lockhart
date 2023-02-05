@@ -1,16 +1,16 @@
 use crate::bytecode::Opcode;
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum Constant {
     DOUBLE(f64),
     STRING(String),
 }
 #[derive(Debug)]
-pub struct Lineno(usize);
+pub struct Lineno(pub usize);
 #[derive(Debug)]
 pub struct Chunk {
-    code: Vec<(Opcode, Lineno)>,
-    constants: Vec<Constant>,
+    pub code: Vec<(Opcode, Lineno)>,
+    pub constants: Vec<Constant>,
 }
 
 impl Chunk {
@@ -21,9 +21,6 @@ impl Chunk {
         }
     }
 
-    // pub fn add_constant_double(&mut self, value: f64) -> usize {
-    //     if let Some(n) = 
-    // }
     pub fn add_constant_double(&mut self, value: f64) -> usize {
         self.add_constant(Constant::DOUBLE(value));
         self.constants.len()
@@ -34,16 +31,8 @@ impl Chunk {
         self.constants.len()
     }
 
-    pub fn add_constant(&mut self, value: Constant) -> usize {
+    fn add_constant(&mut self, value: Constant) -> usize {
         self.constants.push(value);
         self.constants.len()
     }
-
-    // pub fn find<T>(&self, key: T) -> Option<usize> {
-    //     self.constants.iter().find(|x| {
-    //         match x {
-    //             Constant::DOUBLE(n) => 
-    //         }
-    //     })
-    // }
 }

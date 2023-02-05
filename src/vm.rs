@@ -11,6 +11,20 @@ pub struct Vm {
     stack: Vec<Value>,
 }
 
+macro_rules! binary_op {
+    ($op: tt, $x: ident) => {
+        {
+            let right = $x.stack.pop().unwrap();
+            let left = $x.stack.pop().unwrap();
+            if let (Value::NUMBER(x), Value::NUMBER(y)) = (left, right) {
+                $x.stack.push((Value::NUMBER(x $op y)));
+            } else {
+                panic!("Expected type number");
+            }
+        }
+    }
+}
+
 pub enum InterpretResult {
     InterpretOk,
     InterpretCompileError,
@@ -63,6 +77,26 @@ impl Vm {
                             _ => {}
                         }
                     }
+                    Opcode::OPADD => {
+                        binary_op!(+, self);
+                        println!("{:?}", self.peek());
+                    }
+                    Opcode::OPSUBSTRACT => {
+                        binary_op!(-, self);
+                        println!("{:?}", self.peek());
+                    }
+                    Opcode::OPDIVIDE => {
+                        binary_op!(/, self);
+                        println!("{:?}", self.peek());
+                    }
+                    Opcode::OPMULTIPLY => {
+                        binary_op!(*, self);
+                        println!("{:?}", self.peek())
+                    }
+                    Opcode::OPMOD => {
+                        binary_op!(%, self);
+                        println!("{:?}", self.peek())
+                    }
                 }
             }
         }
@@ -71,7 +105,6 @@ impl Vm {
     fn peek(&self) -> Value {
         return self.stack[self.stack.len() - 1].clone();
     }
-
     fn read_constant(&self, idx: usize) -> Value {
         let constant = self.chunk.constants[idx].clone();
         match constant {

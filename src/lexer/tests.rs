@@ -1,6 +1,9 @@
+use crate::token::{Token, TokenType};
 /************************** TESTS *******************/
 #[cfg(test)]
 use crate::token::{Ident, Keywords, Num, Operators};
+
+use super::Lexer;
 
 #[test]
 fn test_token_next() {
@@ -31,4 +34,19 @@ fn test_token_next() {
     assert_eq!(lhs1, rhs1);
     assert_eq!(lhs2, rhs2);
     assert_eq!(lhs3, rhs3);
+}
+
+#[test]
+fn test_comments()
+{
+    let input = "//10\n10".to_string();
+    let mut lexer = Lexer::new(input);
+    lexer.next_token();
+    let rhs = lexer.next_token();
+    let lhs = Token {
+        type_: TokenType::NUM(Num::NUM),
+        literal: "10".to_string(),
+    };
+
+    assert_eq!(lhs, rhs);
 }
