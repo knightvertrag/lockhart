@@ -1,3 +1,5 @@
+use std::thread::panicking;
+
 use crate::{
     bytecode::Opcode,
     chunk::{Chunk, Constant, Lineno},
@@ -5,6 +7,7 @@ use crate::{
 };
 
 mod disassemble;
+mod tests;
 pub struct Vm {
     chunk: Chunk,
     ip: *const (Opcode, Lineno),
@@ -55,8 +58,8 @@ impl Vm {
                 self.ip = self.ip.add(1);
                 match (*ip).0 {
                     Opcode::OPRETURN => {
-                        self.stack.pop();
-                        return InterpretResult::InterpretOk;
+                        // self.stack.pop();
+                        break;
                     }
                     Opcode::OPCONSTANT(idx) => {
                         let constant = self.read_constant(idx);
@@ -66,15 +69,13 @@ impl Vm {
                     }
                     Opcode::OPNEGATE => {
                         let to_negate = self.peek();
-                        match to_negate {
-                            Value::NUMBER(mut n) => {
-                                n = -n;
-                                self.stack.pop();
-                                self.stack.push(Value::NUMBER(n));
-                                println!("{:?}", self.peek());
-                                // return InterpretResult::InterpretOk;
-                            }
-                            _ => {}
+                        if let Value::NUMBER(mut n) = to_negate {
+                            n = -n;
+                            self.stack.pop();
+                            self.stack.push(Value::NUMBER(n));
+                            println!("{:?}", self.peek());
+                        } else {
+                            panic!("Cannot negate a non-number value");
                         }
                     }
                     Opcode::OPADD => {
@@ -100,10 +101,11 @@ impl Vm {
                 }
             }
         }
+        InterpretResult::InterpretOk
     }
 
     fn peek(&self) -> Value {
-        return self.stack[self.stack.len() - 1].clone();
+        return self.stack.last().unwrap().clone();
     }
     fn read_constant(&self, idx: usize) -> Value {
         let constant = self.chunk.constants[idx].clone();
