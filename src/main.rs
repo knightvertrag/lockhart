@@ -5,8 +5,9 @@ mod token;
 mod bytecode;
 mod chunk;
 mod value;
+mod compiler;
 mod vm;
-use chunk::Chunk;
+use chunk::{Chunk, Lineno};
 use bytecode::Opcode;
 use vm::Vm;
 fn main() -> io::Result<()> {
@@ -19,12 +20,9 @@ fn main() -> io::Result<()> {
     // }
     let mut interpreter = Vm::init_vm();
     let mut chunk = Chunk::new();
-    chunk.code.push((Opcode::OPCONSTANT(0), chunk::Lineno(1)));
-    chunk.add_constant_double(5.0);
-    chunk.code.push((Opcode::OPCONSTANT(1), chunk::Lineno(2)));
-    chunk.add_constant_double(4.0);
-    chunk.code.push((Opcode::OPMOD, chunk::Lineno(3)));
-    chunk.code.push((Opcode::OPRETURN, chunk::Lineno(4)));
+    let const_ = chunk.add_constant_double(5.0);
+    chunk.write_chunk(Opcode::OPCONSTANT(const_), Lineno(0));
+    chunk.write_chunk(Opcode::OPNEGATE, Lineno(1));
     interpreter.interpret(chunk);
     Ok(())
 }

@@ -17,7 +17,7 @@ impl Lexer {
             position: 0,
             read_position: 0,
             ch: 0,
-            lineno: 1
+            lineno: 1,
         };
         l.read_char();
         l
@@ -94,7 +94,6 @@ impl Lexer {
                     token = Token::new(tok.clone(), lit.to_string());
                 }
             };
-    
 
             match tok {
                 TokenType::OPERATORS(Operators::ASSIGN) => {
@@ -110,12 +109,12 @@ impl Lexer {
                     build_double(TokenType::OPERATORS(Operators::NEQ), '=', "!");
                 }
                 TokenType::OPERATORS(Operators::DIV) => {
-                    if self.peek_ahead() == Some('/' as u8) { // Check for comment
+                    // Check for comment
+                    if self.peek_ahead() == Some('/' as u8) {
                         while self.ch != '\n' as u8 {
                             self.read_char();
                         }
-                    }
-                    else {
+                    } else {
                         token = Token::new(tok.clone(), current_char);
                     }
                 }
@@ -123,18 +122,22 @@ impl Lexer {
                     token = Token::new(tok.clone(), current_char);
                 }
             }
-        } else if current_char == "\""{ // string literal
+        } else if current_char == "\"" {
+            // string literal
             let literal = Lexer::read_literal(self);
             token = Token::new(TokenType::LITERAL, literal)
-        } else if let Some(tok) = token::DELIMITERS.get(&current_char) { // delimiter
+        } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
+            // delimiter
             token = Token::new(tok.clone(), current_char);
         } else {
-            if Lexer::is_letter(self.ch) { // identifier
+            if Lexer::is_letter(self.ch) {
+                // identifier
                 let literal = Lexer::read_identifier(self, Lexer::is_letter);
                 let tok = Token::check_keyword(&literal);
                 token = Token::new(tok, literal);
                 return token;
-            } else if Lexer::is_number(self.ch) { // number literal
+            } else if Lexer::is_number(self.ch) {
+                // number literal
                 let literal = Lexer::read_identifier(self, Lexer::is_number);
                 token = Token::new(TokenType::NUM(Num::NUM), literal);
                 return token;
