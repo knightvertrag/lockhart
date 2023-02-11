@@ -60,15 +60,16 @@ pub enum Operators {
 pub struct Token {
     pub type_: TokenType,
     pub literal: String,
+    pub lineno: usize,
 }
 
 impl Token {
-    pub fn new(type_: TokenType, literal: String) -> Token {
-        Token { type_, literal }
+    pub fn new(type_: TokenType, literal: String, lineno: usize) -> Token {
+        Token { type_, literal, lineno }
     }
 
     pub fn new_def() -> Token {
-        Token {type_: TokenType::ILLEGAL, literal: "".to_string()}
+        Token {type_: TokenType::ILLEGAL, literal: "".to_string(), lineno: 0}
     }
 
     pub fn check_keyword(ident: &String) -> TokenType {

@@ -7,7 +7,7 @@ pub struct Lexer {
     position: usize,
     read_position: usize,
     ch: u8,
-    lineno: u8,
+    lineno: usize,
 }
 
 impl Lexer {
@@ -55,6 +55,9 @@ impl Lexer {
 
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
+            if self.ch == '\n' as u8 {
+                self.lineno += 1;
+            }
             self.read_char();
         }
     }
@@ -80,7 +83,7 @@ impl Lexer {
     }
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
-        let mut token = Token::new(TokenType::ILLEGAL, "".to_string());
+        let mut token = Token::new(TokenType::ILLEGAL, "".to_string(), self.lineno);
 
         let current_char = (self.ch as char).to_string();
         if let Some(tok) = token::OPERATORS.get(&current_char) {
@@ -88,10 +91,10 @@ impl Lexer {
                 if self.peek_ahead() == Some(next_ch as u8) {
                     let mut literal = lit.to_string();
                     literal.push(next_ch);
-                    token = Token::new(t, literal);
+                    token = Token::new(t, literal, self.lineno);
                     self.read_char();
                 } else {
-                    token = Token::new(tok.clone(), lit.to_string());
+                    token = Token::new(tok.clone(), lit.to_string(), self.lineno);
                 }
             };
 
@@ -115,34 +118,34 @@ impl Lexer {
                             self.read_char();
                         }
                     } else {
-                        token = Token::new(tok.clone(), current_char);
+                        token = Token::new(tok.clone(), current_char, self.lineno);
                     }
                 }
                 _ => {
-                    token = Token::new(tok.clone(), current_char);
+                    token = Token::new(tok.clone(), current_char, self.lineno);
                 }
             }
         } else if current_char == "\"" {
             // string literal
             let literal = Lexer::read_literal(self);
-            token = Token::new(TokenType::LITERAL, literal)
+            token = Token::new(TokenType::LITERAL, literal, self.lineno)
         } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
             // delimiter
-            token = Token::new(tok.clone(), current_char);
+            token = Token::new(tok.clone(), current_char, self.lineno);
         } else {
             if Lexer::is_letter(self.ch) {
                 // identifier
                 let literal = Lexer::read_identifier(self, Lexer::is_letter);
                 let tok = Token::check_keyword(&literal);
-                token = Token::new(tok, literal);
+                token = Token::new(tok, literal, self.lineno);
                 return token;
             } else if Lexer::is_number(self.ch) {
                 // number literal
                 let literal = Lexer::read_identifier(self, Lexer::is_number);
-                token = Token::new(TokenType::NUM(Num::NUM), literal);
+                token = Token::new(TokenType::NUM(Num::NUM), literal, self.lineno);
                 return token;
             } else {
-                token = Token::new(TokenType::ILLEGAL, "".to_string());
+                token = Token::new(TokenType::ILLEGAL, "".to_string(), self.lineno);
             }
         }
 

@@ -13,21 +13,25 @@ fn test_token_next() {
     let lhs = super::token::Token {
         type_: super::token::TokenType::KEYWORDS(Keywords::FUNCTION),
         literal: "fn".to_string(),
+        lineno: 1,
     };
     let rhs1 = lexer.next_token();
     let lhs1 = super::token::Token {
         type_: super::token::TokenType::IDENT(Ident::IDENT),
         literal: "x".to_string(),
+        lineno: 1,
     };
     let rhs2 = lexer.next_token();
     let lhs2 = super::token::Token {
         type_: super::token::TokenType::OPERATORS(Operators::ASSIGN),
         literal: "=".to_string(),
+        lineno: 1,
     };
     let rhs3 = lexer.next_token();
     let lhs3 = super::token::Token {
         type_: super::token::TokenType::NUM(Num::NUM),
         literal: "10".to_string(),
+        lineno: 1,
     };
 
     assert_eq!(lhs, rhs);
@@ -37,8 +41,7 @@ fn test_token_next() {
 }
 
 #[test]
-fn test_comments()
-{
+fn test_comments() {
     let input = "//10\n10".to_string();
     let mut lexer = Lexer::new(input);
     lexer.next_token();
@@ -46,6 +49,7 @@ fn test_comments()
     let lhs = Token {
         type_: TokenType::NUM(Num::NUM),
         literal: "10".to_string(),
+        lineno: 2,
     };
 
     assert_eq!(lhs, rhs);
