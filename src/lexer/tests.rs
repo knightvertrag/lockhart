@@ -54,3 +54,10 @@ fn test_comments() {
 
     assert_eq!(lhs, rhs);
 }
+#[test]
+fn test_error() {
+    let input = "1str".to_string();
+    let mut lexer = Lexer::new(input);
+    let rh1 = lexer.next_token();
+    println!("{}", rh1.literal);
+}
