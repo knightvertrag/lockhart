@@ -2,7 +2,7 @@ use std::thread::panicking;
 
 use crate::{
     bytecode::Opcode,
-    chunk::{Chunk, Constant, Lineno},
+    chunk::{Chunk, Lineno},
     value::Value,
 };
 
@@ -52,7 +52,7 @@ impl Vm {
     }
 
     fn run(&mut self) -> InterpretResult {
-        loop {
+        for _i in 0..self.chunk.code.len() {
             let ip = self.ip;
             unsafe {
                 self.ip = self.ip.add(1);
@@ -110,8 +110,8 @@ impl Vm {
     fn read_constant(&self, idx: usize) -> Value {
         let constant = self.chunk.constants[idx].clone();
         match constant {
-            Constant::DOUBLE(n) => return Value::NUMBER(n),
-            Constant::STRING(s) => return Value::STRING(s),
+            Value::NUMBER(n) => return Value::NUMBER(n),
+            Value::STRING(s) => return Value::STRING(s),
         }
     }
 }
