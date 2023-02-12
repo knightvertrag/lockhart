@@ -20,9 +20,10 @@ fn main() -> io::Result<()> {
     // }
     let mut interpreter = Vm::init_vm();
     let mut chunk = Chunk::new();
-    let const_ = chunk.add_constant_double(5.0);
+    let const_ = chunk.add_constant(value::Value::NUMBER(5.0));
     chunk.write_chunk(Opcode::OPCONSTANT(const_), Lineno(0));
     chunk.write_chunk(Opcode::OPNEGATE, Lineno(1));
+    chunk.write_chunk(Opcode::OPRETURN, Lineno(2));
     interpreter.interpret(chunk);
     Ok(())
 }
