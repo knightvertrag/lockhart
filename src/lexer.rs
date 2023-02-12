@@ -145,7 +145,7 @@ impl Lexer {
                 token = Token::new(TokenType::NUM(Num::NUM), literal, self.lineno);
                 return token;
             } else {
-                token = Token::new(TokenType::ILLEGAL, "".to_string(), self.lineno);
+                panic!("illegal identifier");
             }
         }
 
