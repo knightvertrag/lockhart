@@ -1,12 +1,16 @@
-use std::{num::ParseFloatError, thread::panicking};
-
 use crate::{
     bytecode::Opcode,
     chunk::{Chunk, Lineno},
     lexer::Lexer,
-    token::{Delimiters, Token, TokenType, Operators},
+    token::{Token, TokenType},
     value::Value,
 };
+
+use self::precedence::Precedence;
+
+mod precedence;
+mod parse_rule;
+
 
 struct Parser<'a> {
     previous: Token,
@@ -16,13 +20,9 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(lexer: Lexer, chunk: &'a mut Chunk) -> Parser {
-        let current = Token {
-            literal: "".to_string(),
-            type_: TokenType::EOF,
-            lineno: 0,
-        };
-        let previous = current.clone();
+    pub fn new(lexer: Lexer, chunk: &'a mut Chunk) -> Parser<'a> {
+        let current = Token::new_def();
+        let previous = Token::new_def();
         Parser {
             previous,
             current,
@@ -32,9 +32,7 @@ impl<'a> Parser<'a> {
     }
     fn advance(&mut self) {
         self.previous = self.current.clone();
-        for token in &mut self.lexer {
-            self.current = token;
-        }
+        self.current = self.lexer.next_token();
     }
 
     fn emit_opcode(&mut self, opcode: Opcode) {
@@ -52,32 +50,48 @@ impl<'a> Parser<'a> {
         let idx = self.chunk.add_constant(value);
         self.emit_opcode(Opcode::OPCONSTANT(idx));
     }
-    fn number(&mut self) -> Result<(), ParseFloatError> {
-        let value = Value::NUMBER(str::parse::<f64>(&self.previous.literal)?);
+
+    fn parse_precendence(&mut self, precedence: Precedence) {}
+    fn number(&mut self) {
+        let value = Value::NUMBER(str::parse::<f64>(&self.previous.literal).unwrap());
         self.emit_constant(value);
-        Ok(())
     }
 
     fn grouping(&mut self) {
         self.expression(); // recursively evaluate the expression between the parenthesis
-        self.consume(TokenType::DELIMITERS(Delimiters::RPAREN), "Expected )"); // consume the closing paren or throw error
+        self.consume(TokenType::RPAREN, "Expected )"); // consume the closing paren or throw error
     }
 
-    fn unary_negation(&mut self) {
-        let operator = self.previous.type_.clone();
-        self.expression();
-        match operator {
-            TokenType::OPERATORS(Operators::MINUS) => {
-                self.emit_opcode(Opcode::OPNEGATE);
-            }
-            _ => ()
+    fn unary(&mut self) {
+        let operator_type = self.previous.type_.clone();
+        self.parse_precendence(Precedence::PrecUnary); // evaluate the operand
+        if let TokenType::MINUS = operator_type {
+            self.emit_opcode(Opcode::OPNEGATE);
+        } else {
+            return;
         }
     }
-    fn expression(&mut self) {}
+
+    fn binary(&mut self) {
+        let operator_type = self.previous.type_.clone();
+        match operator_type {
+            TokenType::PLUS => self.emit_opcode(Opcode::OPADD),
+            TokenType::MINUS => self.emit_opcode(Opcode::OPSUBSTRACT),
+            TokenType::MUL => self.emit_opcode(Opcode::OPMULTIPLY),
+            TokenType::DIV => self.emit_opcode(Opcode::OPDIVIDE),
+            _ => {
+                return;
+            }
+        }
+    }
+    fn expression(&mut self) {
+        self.parse_precendence(Precedence::PrecAssignment);
+    }
 }
 
 pub fn compile(source: String, mut chunk: Chunk) -> Result<(), &'static str> {
     let lexer = Lexer::new(source);
     let parser = Parser::new(lexer, &mut chunk);
+
     Ok(())
 }
