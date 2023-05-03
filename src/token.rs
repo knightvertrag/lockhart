@@ -2,36 +2,9 @@ use phf::phf_map;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokenType {
-    IDENT(Ident),
-    NUM(Num),
-    LITERAL,
-    KEYWORDS(Keywords),
-    OPERATORS(Operators),
-    DELIMITERS(Delimiters),
-    ILLEGAL,
-    EOF,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum Ident {
     IDENT,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum Num {
     NUM,
-}
-#[derive(PartialEq, Clone, Debug)]
-pub enum Delimiters {
-    COMMA,
-    SEMICOLON,
-    LBRACE,
-    RBRACE,
-    LPAREN,
-    RPAREN,
-}
-#[derive(PartialEq, Clone, Debug)]
-pub enum Keywords {
+    LITERAL,
     LET,
     FUNCTION,
     IF,
@@ -39,9 +12,6 @@ pub enum Keywords {
     RETURN,
     TRUE,
     FALSE,
-}
-#[derive(PartialEq, Clone, Debug)]
-pub enum Operators {
     ASSIGN,
     NOT,
     GT,
@@ -54,6 +24,14 @@ pub enum Operators {
     MINUS,
     MUL,
     DIV,
+    COMMA,
+    SEMICOLON,
+    LBRACE,
+    RBRACE,
+    LPAREN,
+    RPAREN,
+    ILLEGAL,
+    EOF,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -65,51 +43,59 @@ pub struct Token {
 
 impl Token {
     pub fn new(type_: TokenType, literal: String, lineno: usize) -> Token {
-        Token { type_, literal, lineno }
+        Token {
+            type_,
+            literal,
+            lineno,
+        }
     }
 
     pub fn new_def() -> Token {
-        Token {type_: TokenType::ILLEGAL, literal: "".to_string(), lineno: 0}
+        Token {
+            type_: TokenType::ILLEGAL,
+            literal: "".to_string(),
+            lineno: 0,
+        }
     }
 
     pub fn check_keyword(ident: &String) -> TokenType {
         if let Some(key) = KEYWORDS.get(ident).cloned() {
             return key;
         }
-        TokenType::IDENT(Ident::IDENT)
+        TokenType::IDENT
     }
 }
 
 pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
-    "let" => TokenType::KEYWORDS(Keywords::LET),
-    "fn" => TokenType::KEYWORDS(Keywords::FUNCTION),
-    "true" => TokenType::KEYWORDS(Keywords::TRUE),
-    "false" => TokenType::KEYWORDS(Keywords::FALSE),
-    "return" => TokenType::KEYWORDS(Keywords::RETURN),
-    "if" => TokenType::KEYWORDS(Keywords::IF),
-    "else" => TokenType::KEYWORDS(Keywords::ELSE)
+    "let" => TokenType::LET,
+    "fn" => TokenType::FUNCTION,
+    "true" => TokenType::TRUE,
+    "false" => TokenType::FALSE,
+    "return" => TokenType::RETURN,
+    "if" => TokenType::IF,
+    "else" => TokenType::ELSE
 };
 
 pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! {
-    "=" => TokenType::OPERATORS(Operators::ASSIGN),
-    "!" => TokenType::OPERATORS(Operators::NOT),
-    "<" => TokenType::OPERATORS(Operators::LT),
-    ">" => TokenType::OPERATORS(Operators::GT),
-    "==" => TokenType::OPERATORS(Operators::EQ),
-    "!=" => TokenType::OPERATORS(Operators::NEQ),
-    ">=" => TokenType::OPERATORS(Operators::GEQ),
-    "<=" => TokenType::OPERATORS(Operators::LEQ),
-    "+" => TokenType::OPERATORS(Operators::PLUS),
-    "-" => TokenType::OPERATORS(Operators::MINUS),
-    "*" => TokenType::OPERATORS(Operators::MUL),
-    "/" => TokenType::OPERATORS(Operators::DIV),
+    "=" => TokenType::ASSIGN,
+    "!" => TokenType::NOT,
+    "<" => TokenType::LT,
+    ">" => TokenType::GT,
+    "==" => TokenType::EQ,
+    "!=" => TokenType::NEQ,
+    ">=" => TokenType::GEQ,
+    "<=" => TokenType::LEQ,
+    "+" => TokenType::PLUS,
+    "-" => TokenType::MINUS,
+    "*" => TokenType::MUL,
+    "/" => TokenType::DIV,
 };
 
 pub static DELIMITERS: phf::Map<&'static str, TokenType> = phf_map! {
-    "{" => TokenType::DELIMITERS(Delimiters::LBRACE),
-    "}" => TokenType::DELIMITERS(Delimiters::RBRACE),
-    "(" => TokenType::DELIMITERS(Delimiters::LPAREN),
-    ")" => TokenType::DELIMITERS(Delimiters::RPAREN),
-    "," => TokenType::DELIMITERS(Delimiters::COMMA),
-    ";" => TokenType::DELIMITERS(Delimiters::SEMICOLON)
+    "{" => TokenType::LBRACE,
+    "}" => TokenType::RBRACE,
+    "(" => TokenType::LPAREN,
+    ")" => TokenType::RPAREN,
+    "," => TokenType::COMMA,
+    ";" => TokenType::SEMICOLON,
 };
