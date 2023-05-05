@@ -1,5 +1,5 @@
-use crate::token::{self, Num, Token};
-use crate::token::{Operators, TokenType};
+use crate::token::TokenType;
+use crate::token::{self, Token};
 mod tests;
 #[derive(Debug)]
 pub struct Lexer {
@@ -99,19 +99,19 @@ impl Lexer {
             };
 
             match tok {
-                TokenType::OPERATORS(Operators::ASSIGN) => {
-                    build_double(TokenType::OPERATORS(Operators::EQ), '=', "=");
+                TokenType::ASSIGN => {
+                    build_double(TokenType::EQ, '=', "=");
                 }
-                TokenType::OPERATORS(Operators::GT) => {
-                    build_double(TokenType::OPERATORS(Operators::GEQ), '=', ">");
+                TokenType::GT => {
+                    build_double(TokenType::GEQ, '=', ">");
                 }
-                TokenType::OPERATORS(Operators::LT) => {
-                    build_double(TokenType::OPERATORS(Operators::LEQ), '=', "<");
+                TokenType::LT => {
+                    build_double(TokenType::LEQ, '=', "<");
                 }
-                TokenType::OPERATORS(Operators::NOT) => {
-                    build_double(TokenType::OPERATORS(Operators::NEQ), '=', "!");
+                TokenType::NOT => {
+                    build_double(TokenType::NEQ, '=', "!");
                 }
-                TokenType::OPERATORS(Operators::DIV) => {
+                TokenType::DIV => {
                     // Check for comment
                     if self.peek_ahead() == Some('/' as u8) {
                         while self.ch != '\n' as u8 {
@@ -142,7 +142,7 @@ impl Lexer {
             } else if Lexer::is_number(self.ch) {
                 // number literal
                 let literal = Lexer::read_identifier(self, Lexer::is_number);
-                token = Token::new(TokenType::NUM(Num::NUM), literal, self.lineno);
+                token = Token::new(TokenType::NUM, literal, self.lineno);
                 return token;
             } else {
                 panic!("illegal identifier");

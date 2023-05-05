@@ -1,3 +1,5 @@
+use std::mem::transmute;
+
 use crate::{
     bytecode::Opcode,
     chunk::{Chunk, Lineno},
@@ -6,13 +8,14 @@ use crate::{
     value::Value,
 };
 
-use self::precedence::Precedence;
+use self::{precedence::Precedence, parse_rule::RULES};
 
-mod precedence;
 mod parse_rule;
+mod precedence;
 
+use parse_rule::ParseRule;
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     previous: Token,
     current: Token,
     lexer: Lexer,
@@ -51,7 +54,13 @@ impl<'a> Parser<'a> {
         self.emit_opcode(Opcode::OPCONSTANT(idx));
     }
 
-    fn parse_precendence(&mut self, precedence: Precedence) {}
+    fn parse_precendence(&mut self, precedence: Precedence) {
+        self.advance();
+        let prefix_rule =  RULES[self.current.type_.clone() as usize];
+        if let Some(prefix_fn) = prefix_rule.prefix {
+            prefix_fn(self);
+        }
+    }
     fn number(&mut self) {
         let value = Value::NUMBER(str::parse::<f64>(&self.previous.literal).unwrap());
         self.emit_constant(value);
@@ -74,7 +83,13 @@ impl<'a> Parser<'a> {
 
     fn binary(&mut self) {
         let operator_type = self.previous.type_.clone();
-        match operator_type {
+        let rule = parse_rule::ParseRule::get_rule(operator_type);
+        if (rule.precedence as i8) < 11 {
+            let next_precedence: Precedence = unsafe { transmute(rule.precedence as i8 + 1) };
+            self.parse_precendence(next_precedence);
+        }
+
+        match self.previous.type_ {
             TokenType::PLUS => self.emit_opcode(Opcode::OPADD),
             TokenType::MINUS => self.emit_opcode(Opcode::OPSUBSTRACT),
             TokenType::MUL => self.emit_opcode(Opcode::OPMULTIPLY),
