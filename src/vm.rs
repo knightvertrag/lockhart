@@ -1,5 +1,3 @@
-use std::thread::panicking;
-
 use crate::{
     bytecode::Opcode,
     chunk::{Chunk, Lineno},
@@ -108,10 +106,6 @@ impl Vm {
         return self.stack.last().unwrap().clone();
     }
     fn read_constant(&self, idx: usize) -> Value {
-        let constant = self.chunk.constants[idx].clone();
-        match constant {
-            Value::NUMBER(n) => return Value::NUMBER(n),
-            Value::STRING(s) => return Value::STRING(s),
-        }
+        self.chunk.constants[idx].clone()
     }
 }

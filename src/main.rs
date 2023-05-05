@@ -1,14 +1,14 @@
-use std::{io, env};
+use std::{env, io};
+mod bytecode;
+mod chunk;
+mod compiler;
 mod lexer;
 mod repl;
 mod token;
-mod bytecode;
-mod chunk;
 mod value;
-mod compiler;
 mod vm;
-use chunk::{Chunk, Lineno};
 use bytecode::Opcode;
+use chunk::{Chunk, Lineno};
 use vm::Vm;
 fn main() -> io::Result<()> {
     // let args: Vec<String> = env::args().collect();
