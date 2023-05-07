@@ -1,4 +1,4 @@
-use std::mem::transmute;
+use std::{mem::transmute, thread::panicking};
 
 use crate::{
     bytecode::Opcode,
@@ -8,22 +8,22 @@ use crate::{
     value::Value,
 };
 
-use self::{precedence::Precedence, parse_rule::RULES};
+use self::{parse_rule::RULES, precedence::Precedence};
 
 mod parse_rule;
 mod precedence;
 
 use parse_rule::ParseRule;
 
-pub struct Parser<'a> {
+pub struct Parser {
     previous: Token,
     current: Token,
     lexer: Lexer,
-    chunk: &'a mut Chunk,
+    chunk: Box<Chunk>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(lexer: Lexer, chunk: &'a mut Chunk) -> Parser<'a> {
+impl Parser {
+    pub fn new(lexer: Lexer, chunk: Box<Chunk>) -> Parser {
         let current = Token::new_def();
         let previous = Token::new_def();
         Parser {
@@ -56,9 +56,22 @@ impl<'a> Parser<'a> {
 
     fn parse_precendence(&mut self, precedence: Precedence) {
         self.advance();
-        let prefix_rule =  RULES[self.current.type_.clone() as usize];
+        let prefix_rule = RULES[self.current.type_.clone() as usize];
         if let Some(prefix_fn) = prefix_rule.prefix {
             prefix_fn(self);
+        }
+        else {
+            panic!("error unexpected token");
+        }
+
+        while precedence <= ParseRule::get_rule(self.current.clone().type_).precedence {
+            self.advance();
+            let infix_rule_option = ParseRule::get_rule(self.previous.clone().type_).infix;
+            if let Some(infix_rule) = infix_rule_option {
+                infix_rule(self);
+            } else {
+                panic!("error unexpected token");
+            }
         }
     }
     fn number(&mut self) {
@@ -106,7 +119,7 @@ impl<'a> Parser<'a> {
 
 pub fn compile(source: String, mut chunk: Chunk) -> Result<(), &'static str> {
     let lexer = Lexer::new(source);
-    let parser = Parser::new(lexer, &mut chunk);
+    let parser = Parser::new(lexer, Box::new(chunk));
 
     Ok(())
 }

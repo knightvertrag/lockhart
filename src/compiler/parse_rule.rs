@@ -11,16 +11,16 @@ macro_rules! rule {
         }
     };
 }
-type ParseFn<'a> = fn(&'a mut Parser<'a>) -> ();
+type ParseFn = fn(&mut Parser) -> ();
 #[derive(Clone, Copy)]
-pub struct ParseRule<'a> {
-    pub prefix: Option<ParseFn<'a>>,
-    pub infix: Option<ParseFn<'a>>,
+pub struct ParseRule {
+    pub prefix: Option<ParseFn>,
+    pub infix: Option<ParseFn>,
     pub precedence: Precedence,
 }
 
-impl<'a> ParseRule<'a> {
-    pub fn get_rule(token_type: TokenType) -> &'static ParseRule<'a> {
+impl ParseRule {
+    pub fn get_rule(token_type: TokenType) -> &'static ParseRule {
         &RULES[token_type as usize]
     }
 }
