@@ -1,10 +1,10 @@
 use crate::{
     bytecode::Opcode,
     chunk::{Chunk, Lineno},
-    value::Value,
+    value::Value, compiler::compile,
 };
 
-mod disassemble;
+
 mod tests;
 pub struct Vm {
     chunk: Chunk,
@@ -43,9 +43,8 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = chunk;
-        self.ip = self.chunk.code.as_ptr();
+    pub fn interpret(&mut self, source: String) -> InterpretResult {
+        compile(source, self.chunk.clone()).unwrap();
         return self.run();
     }
 

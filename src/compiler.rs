@@ -1,8 +1,8 @@
-use std::{mem::transmute, thread::panicking};
+use std::{mem::transmute, rc::Rc, cell::RefCell};
 
 use crate::{
     bytecode::Opcode,
-    chunk::{Chunk, Lineno},
+    chunk::{Chunk, Lineno, disassemble::disassemble_code},
     lexer::Lexer,
     token::{Token, TokenType},
     value::Value,
@@ -19,11 +19,11 @@ pub struct Parser {
     previous: Token,
     current: Token,
     lexer: Lexer,
-    chunk: Box<Chunk>,
+    chunk: Rc<RefCell<Chunk>>,
 }
 
 impl Parser {
-    pub fn new(lexer: Lexer, chunk: Box<Chunk>) -> Parser {
+    pub fn new(lexer: Lexer, chunk: Rc<RefCell<Chunk>>) -> Parser {
         let current = Token::new_def();
         let previous = Token::new_def();
         Parser {
@@ -39,7 +39,11 @@ impl Parser {
     }
 
     fn emit_opcode(&mut self, opcode: Opcode) {
-        self.chunk.write_chunk(opcode, Lineno(self.previous.lineno));
+        // Rc::<Chunk>::get_mut(&mut self.chunk).unwrap().write_chunk(opcode, Lineno(self.previous.lineno));
+        // self.chunk.borrow_mut().write_chunk(opcode, Lineno(self.previous.lineno));
+        (*self.chunk).borrow_mut().write_chunk(opcode, Lineno(self.previous.lineno));
+
+        // self.chunk.get_mut().write_chunk(opcode, Lineno(self.previous.lineno));
     }
     /// check if the current token is expected token and advance the lexer
     fn consume(&mut self, type_: TokenType, err: &str) {
@@ -49,8 +53,9 @@ impl Parser {
             panic!("{}", err); // panic if current token in not the expected token
         }
     }
+    
     fn emit_constant(&mut self, value: Value) {
-        let idx = self.chunk.add_constant(value);
+        let idx = (*self.chunk).borrow_mut().add_constant(value);
         self.emit_opcode(Opcode::OPCONSTANT(idx));
     }
 
@@ -60,9 +65,9 @@ impl Parser {
         if let Some(prefix_fn) = prefix_rule.prefix {
             prefix_fn(self);
         }
-        else {
-            panic!("error unexpected token");
-        }
+        // else {
+        //     panic!("error unexpected token");
+        // }
 
         while precedence <= ParseRule::get_rule(self.current.clone().type_).precedence {
             self.advance();
@@ -75,7 +80,7 @@ impl Parser {
         }
     }
     fn number(&mut self) {
-        let value = Value::NUMBER(str::parse::<f64>(&self.previous.literal).unwrap());
+        let value = Value::NUMBER(str::parse::<f64>(&self.current.literal).unwrap());
         self.emit_constant(value);
     }
 
@@ -117,9 +122,13 @@ impl Parser {
     }
 }
 
-pub fn compile(source: String, mut chunk: Chunk) -> Result<(), &'static str> {
+pub fn compile(source: String, chunk: Chunk) -> Result<(), &'static str> {
     let lexer = Lexer::new(source);
-    let parser = Parser::new(lexer, Box::new(chunk));
-
+    let chunk_shared = Rc::new(RefCell::new(chunk));
+    let mut parser = Parser::new(lexer, chunk_shared.clone());
+    // parser.consume(TokenType::EOF, "Expected EOF");
+    // parser.advance();
+    parser.expression();
+    disassemble_code(chunk_shared.clone(), "TEST");
     Ok(())
 }

@@ -1,17 +1,19 @@
+use std::{rc::Rc, cell::RefCell};
+
 use crate::{
     bytecode::Opcode,
     chunk::Chunk,
 };
 
-pub fn disassemble_code(chunk: &Chunk, name: &str) {
+pub fn disassemble_code(chunk: Rc<RefCell<Chunk>>, name: &str) {
     println!("== {name} ==");
-    for (offset, (code, lineno)) in chunk.code.iter().enumerate() {
+    for (offset, (code, lineno)) in chunk.borrow().code.iter().enumerate() {
         match code {
             Opcode::OPRETURN => {
                 simple_instruction("OP_RETURN", offset);
             }
             Opcode::OPCONSTANT(idx) => {
-                constant_instruction("OP_CONSTANT", chunk, *idx, offset);
+                constant_instruction("OP_CONSTANT", &chunk.borrow(), *idx, offset);
             },
             Opcode::OPNEGATE => {}
             Opcode::OPADD => todo!(),
