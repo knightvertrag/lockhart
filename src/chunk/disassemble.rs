@@ -5,15 +5,15 @@ use crate::{
     chunk::Chunk,
 };
 
-pub fn disassemble_code(chunk: Rc<RefCell<Chunk>>, name: &str) {
+pub fn disassemble_code(chunk: &Chunk, name: &str) {
     println!("== {name} ==");
-    for (offset, (code, lineno)) in chunk.borrow().code.iter().enumerate() {
+    for (offset, (code, lineno)) in chunk.code.iter().enumerate() {
         match code {
             Opcode::OPRETURN => {
                 simple_instruction("OP_RETURN", offset);
             }
             Opcode::OPCONSTANT(idx) => {
-                constant_instruction("OP_CONSTANT", &chunk.borrow(), *idx, offset);
+                constant_instruction("OP_CONSTANT", &chunk, *idx, offset);
             },
             Opcode::OPNEGATE => {}
             Opcode::OPADD => todo!(),
