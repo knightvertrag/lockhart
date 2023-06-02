@@ -1,14 +1,14 @@
 use crate::{
     bytecode::Opcode,
     chunk::{Chunk, Lineno},
-    value::Value, compiler::compile,
+    compiler::compile,
+    value::Value,
 };
-
 
 mod tests;
 pub struct Vm {
     chunk: Chunk,
-    ip: *const (Opcode, Lineno),
+    ip: usize,
     stack: Vec<Value>,
 }
 
@@ -35,7 +35,7 @@ pub enum InterpretResult {
 impl Vm {
     pub fn init_vm() -> Vm {
         let chunk = Chunk::new();
-        let ip = chunk.code.as_ptr();
+        let ip = 0;
         Vm {
             chunk,
             ip,
@@ -44,57 +44,56 @@ impl Vm {
     }
 
     pub fn interpret(&mut self, source: String) -> InterpretResult {
-        compile(source, self.chunk.clone()).unwrap();
+        compile(source, &mut self.chunk).unwrap();
         return self.run();
     }
 
     fn run(&mut self) -> InterpretResult {
         for _i in 0..self.chunk.code.len() {
             let ip = self.ip;
-            unsafe {
-                self.ip = self.ip.add(1);
-                match (*ip).0 {
-                    Opcode::OPRETURN => {
-                        // self.stack.pop();
-                        break;
-                    }
-                    Opcode::OPCONSTANT(idx) => {
-                        let constant = self.read_constant(idx);
-                        println!("{:?}", constant);
-                        self.stack.push(constant);
-                        // return InterpretResult::InterpretOk;
-                    }
-                    Opcode::OPNEGATE => {
-                        let to_negate = self.peek();
-                        if let Value::NUMBER(mut n) = to_negate {
-                            n = -n;
-                            self.stack.pop();
-                            self.stack.push(Value::NUMBER(n));
-                            println!("{:?}", self.peek());
-                        } else {
-                            panic!("Cannot negate a non-number value");
-                        }
-                    }
-                    Opcode::OPADD => {
-                        binary_op!(+, self);
+
+            self.ip = self.ip + 1;
+            match self.chunk.code[ip].0 {
+                Opcode::OPRETURN => {
+                    // self.stack.pop();
+                    break;
+                }
+                Opcode::OPCONSTANT(idx) => {
+                    let constant = self.read_constant(idx);
+                    println!("{:?}", constant);
+                    self.stack.push(constant);
+                    // return InterpretResult::InterpretOk;
+                }
+                Opcode::OPNEGATE => {
+                    let to_negate = self.peek();
+                    if let Value::NUMBER(mut n) = to_negate {
+                        n = -n;
+                        self.stack.pop();
+                        self.stack.push(Value::NUMBER(n));
                         println!("{:?}", self.peek());
+                    } else {
+                        panic!("Cannot negate a non-number value");
                     }
-                    Opcode::OPSUBSTRACT => {
-                        binary_op!(-, self);
-                        println!("{:?}", self.peek());
-                    }
-                    Opcode::OPDIVIDE => {
-                        binary_op!(/, self);
-                        println!("{:?}", self.peek());
-                    }
-                    Opcode::OPMULTIPLY => {
-                        binary_op!(*, self);
-                        println!("{:?}", self.peek())
-                    }
-                    Opcode::OPMOD => {
-                        binary_op!(%, self);
-                        println!("{:?}", self.peek())
-                    }
+                }
+                Opcode::OPADD => {
+                    binary_op!(+, self);
+                    println!("{:?}", self.peek());
+                }
+                Opcode::OPSUBSTRACT => {
+                    binary_op!(-, self);
+                    println!("{:?}", self.peek());
+                }
+                Opcode::OPDIVIDE => {
+                    binary_op!(/, self);
+                    println!("{:?}", self.peek());
+                }
+                Opcode::OPMULTIPLY => {
+                    binary_op!(*, self);
+                    println!("{:?}", self.peek())
+                }
+                Opcode::OPMOD => {
+                    binary_op!(%, self);
+                    println!("{:?}", self.peek())
                 }
             }
         }
