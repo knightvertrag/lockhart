@@ -82,6 +82,9 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
     pub fn next_token(&mut self) -> Token {
+        if self.read_position > self.input.len() {
+            return Token::new(TokenType::EOF, "".to_string(), self.lineno)
+        }
         self.skip_whitespace();
         let mut token = Token::new(TokenType::ILLEGAL, "".to_string(), self.lineno);
 
