@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Error, mem::transmute, rc::Rc};
 
 use crate::{
     bytecode::Opcode,
-    chunk::{disassemble::disassemble_code, Chunk, Lineno},
+    chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
     lexer::{self, Lexer},
     token::{Token, TokenType},
     value::Value,
@@ -175,14 +175,6 @@ impl Parser<'_> {
         }
     }
 
-    // fn number(&mut self) {}
-
-    // fn grouping(&mut self) {}
-
-    // fn unary(&mut self) {}
-
-    // fn binary(&mut self) {}
-
     fn expression(&mut self) {
         self.parse_precendence(Precedence::PrecAssignment);
     }
@@ -199,6 +191,6 @@ pub fn compile(source: String, chunk: &mut Chunk) -> Result<(), &'static str> {
     parser.expression();
     parser.consume(TokenType::EOF, "Expected EOF");
     parser.end_compiler();
-    // disassemble_code(chunk, "TEST");
+    // disassemble_chunk(chunk, "TEST");
     Ok(())
 }

@@ -1,6 +1,6 @@
 use crate::{
     bytecode::Opcode,
-    chunk::{Chunk, Lineno},
+    chunk::{Chunk, Lineno, disassemble::disassemble_instruction},
     compiler::compile,
     value::Value,
 };
@@ -50,9 +50,10 @@ impl Vm {
 
     fn run(&mut self) -> InterpretResult {
         for _i in 0..self.chunk.code.len() {
+            disassemble_instruction(&self.chunk, _i);
             let ip = self.ip;
 
-            self.ip = self.ip + 1;
+            self.ip += 1;
             match self.chunk.code[ip].0 {
                 Opcode::OPRETURN => {
                     // self.stack.pop();
@@ -60,7 +61,7 @@ impl Vm {
                 }
                 Opcode::OPCONSTANT(idx) => {
                     let constant = self.read_constant(idx);
-                    println!("{:?}", constant);
+                    // println!("{:?}", constant);
                     self.stack.push(constant);
                     // return InterpretResult::InterpretOk;
                 }
@@ -77,23 +78,23 @@ impl Vm {
                 }
                 Opcode::OPADD => {
                     binary_op!(+, self);
-                    println!("{:?}", self.peek());
+                    // println!("{:?}", self.peek());
                 }
                 Opcode::OPSUBSTRACT => {
                     binary_op!(-, self);
-                    println!("{:?}", self.peek());
+                    // println!("{:?}", self.peek());
                 }
                 Opcode::OPDIVIDE => {
                     binary_op!(/, self);
-                    println!("{:?}", self.peek());
+                    // println!("{:?}", self.peek());
                 }
                 Opcode::OPMULTIPLY => {
                     binary_op!(*, self);
-                    println!("{:?}", self.peek())
+                    // println!("{:?}", self.peek())
                 }
                 Opcode::OPMOD => {
                     binary_op!(%, self);
-                    println!("{:?}", self.peek())
+                    // println!("{:?}", self.peek())
                 }
             }
         }
