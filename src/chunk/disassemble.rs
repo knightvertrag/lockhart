@@ -40,6 +40,15 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) {
         Opcode::OPMOD => {
             simple_instruction("OP_MOD", offset);
         }
+        Opcode::OPTRUE => {
+            simple_instruction("OP_TRUE", offset);
+        }
+        Opcode::OPFALSE => {
+            simple_instruction("OP_FALSE", offset);
+        }
+        Opcode::OPNIL => {
+            simple_instruction("OP_NIL", offset);
+        }
     }
 }
 

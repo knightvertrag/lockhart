@@ -7,6 +7,9 @@ pub enum Opcode {
     OPSUBSTRACT,
     OPMULTIPLY,
     OPDIVIDE,
-    OPMOD
+    OPMOD,
+    OPTRUE,
+    OPFALSE,
+    OPNIL,
 }
 

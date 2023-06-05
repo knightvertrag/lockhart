@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     // } else {
     //     let src_filename = &args[1];
     // }
-    let s = "1 + 2*3";
+    let s = "true";
     let mut interpreter = Vm::init_vm();
     interpreter.interpret(s.to_string());
     // let const_ = chunk.add_constant(value::Value::NUMBER(5.0));

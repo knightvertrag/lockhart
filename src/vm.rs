@@ -96,6 +96,9 @@ impl Vm {
                     binary_op!(%, self);
                     // println!("{:?}", self.peek())
                 }
+                Opcode::OPTRUE => self.stack.push(Value::BOOL(true)),
+                Opcode::OPFALSE => self.stack.push(Value::BOOL(false)),
+                Opcode::OPNIL => self.stack.push(Value::NIL),
             }
         }
         InterpretResult::InterpretOk

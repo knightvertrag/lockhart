@@ -29,12 +29,12 @@ impl ParseRule {
     }
 }
 
-pub static RULES: [ParseRule; 30] = {
+pub static RULES: [ParseRule; 31] = {
     let mut a = [ParseRule {
         prefix: None,
         infix: None,
         precedence: PrecNone,
-    }; 30];
+    }; 31];
     rule!(a, IDENT, None, None, PrecNone);
     rule!(a, NUM, Some(|x| x.number()), None, PrecNone);
     rule!(a, LITERAL, None, None, PrecNone);
@@ -43,8 +43,9 @@ pub static RULES: [ParseRule; 30] = {
     rule!(a, IF, None, None, PrecNone);
     rule!(a, ELSE, None, None, PrecNone);
     rule!(a, RETURN, None, None, PrecNone);
-    rule!(a, TRUE, None, None, PrecNone);
-    rule!(a, FALSE, None, None, PrecNone);
+    rule!(a, TRUE, Some(|x| x.literal()), None, PrecNone);
+    rule!(a, FALSE, Some(|x| x.literal()), None, PrecNone);
+    rule!(a, NIL, Some(|x| x.literal()), None, PrecNone);
     rule!(a, ASSIGN, None, None, PrecNone);
     rule!(a, NOT, None, None, PrecNone);
     rule!(a, GT, None, None, PrecNone);

@@ -59,6 +59,8 @@ pub trait Parsable {
 
     fn number(&mut self);
 
+    fn literal(&mut self);
+
     fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
@@ -104,10 +106,24 @@ impl Parsable for Parser<'_> {
     }
 
     fn number(&mut self) {
-        let value = Value::NUMBER(str::parse::<f64>(&self.previous.literal).unwrap());
+        let value = Value::NUMBER(self.previous.literal.parse::<f64>().unwrap());
         self.emit_constant(value);
     }
 
+    fn literal(&mut self) {
+        match self.previous.type_ {
+            TokenType::TRUE => {
+                self.emit_opcode(Opcode::OPTRUE);
+            }
+            TokenType::FALSE => {
+                self.emit_opcode(Opcode::OPFALSE);
+            }
+            TokenType::NIL => {
+                self.emit_opcode(Opcode::OPNIL);
+            }
+            _ => unreachable!()
+        }
+    }
     fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
         match parse_fn {
             ParseFn::Binary => self.binary(),
