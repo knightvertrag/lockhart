@@ -12,6 +12,7 @@ pub enum TokenType {
     RETURN,
     TRUE,
     FALSE,
+    NIL,
     ASSIGN,
     NOT,
     GT,
@@ -73,7 +74,8 @@ pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "false" => TokenType::FALSE,
     "return" => TokenType::RETURN,
     "if" => TokenType::IF,
-    "else" => TokenType::ELSE
+    "else" => TokenType::ELSE,
+    "nil" => TokenType::NIL,
 };
 
 pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! {

@@ -29,12 +29,12 @@ impl ParseRule {
     }
 }
 
-pub static RULES: [ParseRule; 30] = {
+pub static RULES: [ParseRule; 31] = {
     let mut a = [ParseRule {
         prefix: None,
         infix: None,
         precedence: PrecNone,
-    }; 30];
+    }; 31];
     rule!(a, IDENT, None, None, PrecNone);
     rule!(a, NUM, Some(|x| x.number()), None, PrecNone);
     rule!(a, LITERAL, None, None, PrecNone);
@@ -43,16 +43,17 @@ pub static RULES: [ParseRule; 30] = {
     rule!(a, IF, None, None, PrecNone);
     rule!(a, ELSE, None, None, PrecNone);
     rule!(a, RETURN, None, None, PrecNone);
-    rule!(a, TRUE, None, None, PrecNone);
-    rule!(a, FALSE, None, None, PrecNone);
+    rule!(a, TRUE, Some(|x| x.literal()), None, PrecNone);
+    rule!(a, FALSE, Some(|x| x.literal()), None, PrecNone);
+    rule!(a, NIL, Some(|x| x.literal()), None, PrecNone);
     rule!(a, ASSIGN, None, None, PrecNone);
-    rule!(a, NOT, None, None, PrecNone);
-    rule!(a, GT, None, None, PrecNone);
-    rule!(a, LT, None, None, PrecNone);
-    rule!(a, GEQ, None, None, PrecNone);
-    rule!(a, LEQ, None, None, PrecNone);
-    rule!(a, EQ, None, None, PrecNone);
-    rule!(a, NEQ, None, None, PrecNone);
+    rule!(a, NOT, Some(|x| x.unary()), None, PrecNone);
+    rule!(a, GT, None, Some(|x| x.binary()), PrecComparison);
+    rule!(a, LT,  None, Some(|x| x.binary()), PrecComparison);
+    rule!(a, GEQ,  None, Some(|x| x.binary()), PrecComparison);
+    rule!(a, LEQ,  None, Some(|x| x.binary()), PrecComparison);
+    rule!(a, EQ,  None, Some(|x| x.binary()), PrecEquality);
+    rule!(a, NEQ,  None, Some(|x| x.binary()), PrecEquality);
     rule!(a, PLUS, None, Some(|x| x.binary()), PrecTerm);
     rule!(a, MINUS, Some(|x| x.unary()), Some(|x| x.binary()), PrecTerm);
     rule!(a, MUL, None, Some(|x| x.binary()), PrecFactor);
@@ -69,42 +70,3 @@ pub static RULES: [ParseRule; 30] = {
     a
 };
 
-// pub static RULES: [ParseRule; 30] = {
-//     let mut a = [ParseRule {
-//         prefix: None,
-//         infix: None,
-//         precedence: PrecNone,
-//     }; 30];
-//     rule!(a, IDENT, None, None, PrecNone);
-//     rule!(a, NUM, Some(number), None, PrecNone);
-//     rule!(a, LITERAL, None, None, PrecNone);
-//     rule!(a, LET, None, None, PrecNone);
-//     rule!(a, FUNCTION, None, None, PrecNone);
-//     rule!(a, IF, None, None, PrecNone);
-//     rule!(a, ELSE, None, None, PrecNone);
-//     rule!(a, RETURN, None, None, PrecNone);
-//     rule!(a, TRUE, None, None, PrecNone);
-//     rule!(a, FALSE, None, None, PrecNone);
-//     rule!(a, ASSIGN, None, None, PrecNone);
-//     rule!(a, NOT, None, None, PrecNone);
-//     rule!(a, GT, None, None, PrecNone);
-//     rule!(a, LT, None, None, PrecNone);
-//     rule!(a, GEQ, None, None, PrecNone);
-//     rule!(a, LEQ, None, None, PrecNone);
-//     rule!(a, EQ, None, None, PrecNone);
-//     rule!(a, NEQ, None, None, PrecNone);
-//     rule!(a, PLUS, None, Some(binary), PrecTerm);
-//     rule!(a, MINUS, Some(unary), Some(binary), PrecTerm);
-//     rule!(a, MUL, None, Some(binary), PrecFactor);
-//     rule!(a, DIV, None, Some(binary), PrecFactor);
-//     rule!(a, COMMA, None, None, PrecNone);
-//     rule!(a, SEMICOLON, None, None, PrecNone);
-//     rule!(a, LBRACE, Some(grouping), None, PrecNone);
-//     rule!(a, RBRACE, Some(grouping), None, PrecNone);
-//     rule!(a, LPAREN, Some(grouping), None, PrecNone);
-//     rule!(a, RPAREN, Some(grouping), None, PrecNone);
-//     rule!(a, ILLEGAL, None, None, PrecNone);
-//     rule!(a, EOF, None, None, PrecNone);
-
-//     a
-// };

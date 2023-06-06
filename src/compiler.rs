@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Error, mem::transmute, rc::Rc};
 
 use crate::{
     bytecode::Opcode,
-    chunk::{disassemble::disassemble_code, Chunk, Lineno},
+    chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
     lexer::{self, Lexer},
     token::{Token, TokenType},
     value::Value,
@@ -59,6 +59,8 @@ pub trait Parsable {
 
     fn number(&mut self);
 
+    fn literal(&mut self);
+
     fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
@@ -72,10 +74,10 @@ impl Parsable for Parser<'_> {
     fn unary(&mut self) {
         let operator_type = self.previous.type_.clone();
         self.parse_precendence(Precedence::PrecUnary); // evaluate the operand
-        if let TokenType::MINUS = operator_type {
-            self.emit_opcode(Opcode::OPNEGATE);
-        } else {
-            return;
+        match operator_type {
+            TokenType::MINUS => self.emit_opcode(Opcode::OPNEGATE),
+            TokenType::NOT => self.emit_opcode(Opcode::OPNOT),
+            _ => unreachable!()
         }
     }
 
@@ -92,9 +94,15 @@ impl Parsable for Parser<'_> {
             TokenType::MINUS => self.emit_opcode(Opcode::OPSUBSTRACT),
             TokenType::MUL => self.emit_opcode(Opcode::OPMULTIPLY),
             TokenType::DIV => self.emit_opcode(Opcode::OPDIVIDE),
-            _ => {
-                return;
-            }
+            TokenType::GT => self.emit_opcode(Opcode::OPGT),
+            TokenType::LT => self.emit_opcode(Opcode::OPLT),
+            TokenType::EQ => self.emit_opcode(Opcode::OPEQ),
+            // todo: use dedicated opcodes and implementations for double operators
+            TokenType::GEQ => self.emit_opcodes(Opcode::OPLT, Opcode::OPNOT),
+            TokenType::LEQ => self.emit_opcodes(Opcode::OPGT , Opcode::OPNOT),
+            TokenType::NEQ => self.emit_opcodes(Opcode::OPEQ, Opcode::OPNOT),
+            _ => unreachable!(),
+            
         }
     }
 
@@ -104,10 +112,24 @@ impl Parsable for Parser<'_> {
     }
 
     fn number(&mut self) {
-        let value = Value::NUMBER(str::parse::<f64>(&self.previous.literal).unwrap());
+        let value = Value::NUMBER(self.previous.literal.parse::<f64>().unwrap());
         self.emit_constant(value);
     }
 
+    fn literal(&mut self) {
+        match self.previous.type_ {
+            TokenType::TRUE => {
+                self.emit_opcode(Opcode::OPTRUE);
+            }
+            TokenType::FALSE => {
+                self.emit_opcode(Opcode::OPFALSE);
+            }
+            TokenType::NIL => {
+                self.emit_opcode(Opcode::OPNIL);
+            }
+            _ => unreachable!()
+        }
+    }
     fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
         match parse_fn {
             ParseFn::Binary => self.binary(),
@@ -175,14 +197,6 @@ impl Parser<'_> {
         }
     }
 
-    // fn number(&mut self) {}
-
-    // fn grouping(&mut self) {}
-
-    // fn unary(&mut self) {}
-
-    // fn binary(&mut self) {}
-
     fn expression(&mut self) {
         self.parse_precendence(Precedence::PrecAssignment);
     }
@@ -199,6 +213,6 @@ pub fn compile(source: String, chunk: &mut Chunk) -> Result<(), &'static str> {
     parser.expression();
     parser.consume(TokenType::EOF, "Expected EOF");
     parser.end_compiler();
-    // disassemble_code(chunk, "TEST");
+    // disassemble_chunk(chunk, "TEST");
     Ok(())
 }

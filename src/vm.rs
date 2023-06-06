@@ -1,6 +1,6 @@
 use crate::{
     bytecode::Opcode,
-    chunk::{Chunk, Lineno},
+    chunk::{disassemble::disassemble_instruction, Chunk, Lineno},
     compiler::compile,
     value::Value,
 };
@@ -13,12 +13,12 @@ pub struct Vm {
 }
 
 macro_rules! binary_op {
-    ($op: tt, $x: ident) => {
+    ($val: ident, $op: tt, $x: ident) => {
         {
             let right = $x.stack.pop().unwrap();
             let left = $x.stack.pop().unwrap();
             if let (Value::NUMBER(x), Value::NUMBER(y)) = (left, right) {
-                $x.stack.push((Value::NUMBER(x $op y)));
+                $x.stack.push((Value::$val(x $op y)));
             } else {
                 panic!("Expected type number");
             }
@@ -50,17 +50,16 @@ impl Vm {
 
     fn run(&mut self) -> InterpretResult {
         for _i in 0..self.chunk.code.len() {
-            let ip = self.ip;
+            disassemble_instruction(&self.chunk, _i);
 
-            self.ip = self.ip + 1;
-            match self.chunk.code[ip].0 {
+            match self.chunk.code[self.ip].0 {
                 Opcode::OPRETURN => {
                     // self.stack.pop();
                     break;
                 }
                 Opcode::OPCONSTANT(idx) => {
                     let constant = self.read_constant(idx);
-                    println!("{:?}", constant);
+                    // println!("{:?}", constant);
                     self.stack.push(constant);
                     // return InterpretResult::InterpretOk;
                 }
@@ -76,32 +75,52 @@ impl Vm {
                     }
                 }
                 Opcode::OPADD => {
-                    binary_op!(+, self);
-                    println!("{:?}", self.peek());
+                    binary_op!(NUMBER, +, self);
+                    // println!("{:?}", self.peek());
                 }
                 Opcode::OPSUBSTRACT => {
-                    binary_op!(-, self);
-                    println!("{:?}", self.peek());
+                    binary_op!(NUMBER, -, self);
+                    // println!("{:?}", self.peek());
                 }
                 Opcode::OPDIVIDE => {
-                    binary_op!(/, self);
-                    println!("{:?}", self.peek());
+                    binary_op!(NUMBER, /, self);
+                    // println!("{:?}", self.peek());
                 }
                 Opcode::OPMULTIPLY => {
-                    binary_op!(*, self);
-                    println!("{:?}", self.peek())
+                    binary_op!(NUMBER, *, self);
+                    // println!("{:?}", self.peek())
                 }
                 Opcode::OPMOD => {
-                    binary_op!(%, self);
-                    println!("{:?}", self.peek())
+                    binary_op!(NUMBER, %, self);
+                    // println!("{:?}", self.peek())
+                }
+                Opcode::OPTRUE => self.stack.push(Value::BOOL(true)),
+                Opcode::OPFALSE => self.stack.push(Value::BOOL(false)),
+                Opcode::OPNIL => self.stack.push(Value::NIL),
+                Opcode::OPNOT => {
+                    let falsified = Value::BOOL(Value::falsify(&self.stack.pop().unwrap()));
+                    self.stack.push(falsified);
+                }
+                Opcode::OPEQ => {
+                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    self.stack.push(Value::BOOL(Value::values_equal(&a, &b)));
+                }
+                Opcode::OPGT => {
+                    binary_op!(BOOL, >, self);
+                }
+                Opcode::OPLT => {
+                    binary_op!(BOOL, <, self);
                 }
             }
+            self.ip += 1;
         }
+        println!("{:?}", self.peek());
         InterpretResult::InterpretOk
     }
 
     fn peek(&self) -> Value {
-        return self.stack.last().unwrap().clone();
+        self.stack.last().unwrap().clone()
     }
     fn read_constant(&self, idx: usize) -> Value {
         self.chunk.constants[idx].clone()
