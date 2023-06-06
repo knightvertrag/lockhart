@@ -11,6 +11,10 @@ pub enum Opcode {
     OPTRUE,
     OPFALSE,
     OPNOT,
+    // comaparators
+    OPEQ,
+    OPGT,
+    OPLT,
     OPNIL,
 }
 

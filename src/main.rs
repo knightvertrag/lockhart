@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     // } else {
     //     let src_filename = &args[1];
     // }
-    let s = "!1";
+    let s = " 4 != 4";
     let mut interpreter = Vm::init_vm();
     interpreter.interpret(s.to_string());
     Ok(())

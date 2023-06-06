@@ -94,9 +94,15 @@ impl Parsable for Parser<'_> {
             TokenType::MINUS => self.emit_opcode(Opcode::OPSUBSTRACT),
             TokenType::MUL => self.emit_opcode(Opcode::OPMULTIPLY),
             TokenType::DIV => self.emit_opcode(Opcode::OPDIVIDE),
-            _ => {
-                return;
-            }
+            TokenType::GT => self.emit_opcode(Opcode::OPGT),
+            TokenType::LT => self.emit_opcode(Opcode::OPLT),
+            TokenType::EQ => self.emit_opcode(Opcode::OPEQ),
+            // todo: use dedicated opcodes and implementations for double operators
+            TokenType::GEQ => self.emit_opcodes(Opcode::OPLT, Opcode::OPNOT),
+            TokenType::LEQ => self.emit_opcodes(Opcode::OPGT , Opcode::OPNOT),
+            TokenType::NEQ => self.emit_opcodes(Opcode::OPEQ, Opcode::OPNOT),
+            _ => unreachable!(),
+            
         }
     }
 
