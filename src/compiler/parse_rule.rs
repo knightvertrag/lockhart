@@ -47,7 +47,7 @@ pub static RULES: [ParseRule; 31] = {
     rule!(a, FALSE, Some(|x| x.literal()), None, PrecNone);
     rule!(a, NIL, Some(|x| x.literal()), None, PrecNone);
     rule!(a, ASSIGN, None, None, PrecNone);
-    rule!(a, NOT, None, None, PrecNone);
+    rule!(a, NOT, Some(|x| x.unary()), None, PrecNone);
     rule!(a, GT, None, None, PrecNone);
     rule!(a, LT, None, None, PrecNone);
     rule!(a, GEQ, None, None, PrecNone);

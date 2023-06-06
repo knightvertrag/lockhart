@@ -49,6 +49,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) {
         Opcode::OPNIL => {
             simple_instruction("OP_NIL", offset);
         }
+        Opcode::OPNOT => {
+            simple_instruction("OP_NOT", offset);
+        },
     }
 }
 

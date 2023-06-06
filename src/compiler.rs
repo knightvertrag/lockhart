@@ -74,10 +74,10 @@ impl Parsable for Parser<'_> {
     fn unary(&mut self) {
         let operator_type = self.previous.type_.clone();
         self.parse_precendence(Precedence::PrecUnary); // evaluate the operand
-        if let TokenType::MINUS = operator_type {
-            self.emit_opcode(Opcode::OPNEGATE);
-        } else {
-            return;
+        match operator_type {
+            TokenType::MINUS => self.emit_opcode(Opcode::OPNEGATE),
+            TokenType::NOT => self.emit_opcode(Opcode::OPNOT),
+            _ => unreachable!()
         }
     }
 

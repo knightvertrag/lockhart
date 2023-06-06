@@ -1,6 +1,6 @@
 use crate::{
     bytecode::Opcode,
-    chunk::{Chunk, Lineno, disassemble::disassemble_instruction},
+    chunk::{disassemble::disassemble_instruction, Chunk, Lineno},
     compiler::compile,
     value::Value,
 };
@@ -99,8 +99,13 @@ impl Vm {
                 Opcode::OPTRUE => self.stack.push(Value::BOOL(true)),
                 Opcode::OPFALSE => self.stack.push(Value::BOOL(false)),
                 Opcode::OPNIL => self.stack.push(Value::NIL),
+                Opcode::OPNOT => {
+                    let falsified = Value::BOOL(Self::falsify(&self.stack.pop().unwrap()));
+                    self.stack.push(falsified);
+                }
             }
         }
+        println!("{:?}", self.peek());
         InterpretResult::InterpretOk
     }
 
@@ -109,5 +114,19 @@ impl Vm {
     }
     fn read_constant(&self, idx: usize) -> Value {
         self.chunk.constants[idx].clone()
+    }
+
+    fn falsify(value: &Value) -> bool {
+        match value {
+            Value::BOOL(x) => !*x,
+            Value::NUMBER(x) => {
+                if *x == 0f64 {
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 }

@@ -10,6 +10,7 @@ pub enum Opcode {
     OPMOD,
     OPTRUE,
     OPFALSE,
+    OPNOT,
     OPNIL,
 }
 
