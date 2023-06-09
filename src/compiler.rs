@@ -61,6 +61,7 @@ pub trait Parsable {
 
     fn literal(&mut self);
 
+    fn string(&mut self);
     fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
@@ -129,6 +130,11 @@ impl Parsable for Parser<'_> {
             }
             _ => unreachable!()
         }
+    }
+
+    fn string(&mut self) {
+        let lexeme = self.previous.literal.clone();
+        self.emit_constant(Value::STR(lexeme));
     }
     fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
         match parse_fn {

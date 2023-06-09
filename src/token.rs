@@ -4,7 +4,7 @@ use phf::phf_map;
 pub enum TokenType {
     IDENT,
     NUM,
-    LITERAL,
+    STRING,
     LET,
     FUNCTION,
     IF,

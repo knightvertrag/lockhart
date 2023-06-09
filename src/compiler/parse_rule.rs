@@ -37,7 +37,7 @@ pub static RULES: [ParseRule; 31] = {
     }; 31];
     rule!(a, IDENT, None, None, PrecNone);
     rule!(a, NUM, Some(|x| x.number()), None, PrecNone);
-    rule!(a, LITERAL, None, None, PrecNone);
+    rule!(a, STRING, Some(|x| x.string()), None, PrecNone);
     rule!(a, LET, None, None, PrecNone);
     rule!(a, FUNCTION, None, None, PrecNone);
     rule!(a, IF, None, None, PrecNone);
