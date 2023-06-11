@@ -61,6 +61,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) {
         Opcode::OPLT => {
             simple_instruction("OP_LT", offset);
         },
+        Opcode::OPPRINT => {
+            simple_instruction("OP_PRINT", offset);
+        },
     }
 }
 

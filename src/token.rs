@@ -4,11 +4,12 @@ use phf::phf_map;
 pub enum TokenType {
     IDENT,
     NUM,
-    LITERAL,
+    STRING,
     LET,
     FUNCTION,
     IF,
     ELSE,
+    PRINT,
     RETURN,
     TRUE,
     FALSE,
@@ -70,6 +71,7 @@ impl Token {
 pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "let" => TokenType::LET,
     "fn" => TokenType::FUNCTION,
+    "print" => TokenType::PRINT,
     "true" => TokenType::TRUE,
     "false" => TokenType::FALSE,
     "return" => TokenType::RETURN,

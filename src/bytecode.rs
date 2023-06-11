@@ -15,6 +15,6 @@ pub enum Opcode {
     OPEQ,
     OPGT,
     OPLT,
+    OPPRINT,
     OPNIL,
 }
-

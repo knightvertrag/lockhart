@@ -130,8 +130,8 @@ impl Lexer {
             }
         } else if current_char == "\"" {
             // string literal
-            let literal = Lexer::read_literal(self);
-            token = Token::new(TokenType::LITERAL, literal, self.lineno)
+            let str = Lexer::read_literal(self);
+            token = Token::new(TokenType::STRING, str, self.lineno)
         } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
             // delimiter
             token = Token::new(tok.clone(), current_char, self.lineno);
