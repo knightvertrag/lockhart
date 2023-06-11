@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     NUMBER(f64),
@@ -54,6 +56,17 @@ impl Value {
             }
         } else {
             false
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::NUMBER(x) => write!(f, "{}", x),
+            Value::BOOL(x) =>write!(f, "{}", x),
+            Value::STR(s) => write!(f, "{}", s),
+            Value::NIL => write!(f, "nil"),
         }
     }
 }

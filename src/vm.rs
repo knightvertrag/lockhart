@@ -52,7 +52,7 @@ impl Vm {
 
     fn run(&mut self) -> InterpretResult {
         for _i in 0..self.chunk.code.len() {
-            disassemble_instruction(&self.chunk, _i);
+            // disassemble_instruction(&self.chunk, _i);
 
             match self.chunk.code[self.ip].0 {
                 Opcode::OPRETURN => {
@@ -125,10 +125,14 @@ impl Vm {
                 Opcode::OPLT => {
                     binary_op!(BOOL, <, self);
                 }
+                Opcode::OPPRINT => {
+                    let val = self.stack.pop().unwrap();
+                    println!("{}", val);
+                },
             }
             self.ip += 1;
         }
-        println!("{:?}", self.peek(0));
+        // println!("{:?}", self.peek(0));
         InterpretResult::InterpretOk
     }
 

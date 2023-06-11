@@ -15,42 +15,43 @@ mod precedence;
 
 use parse_rule::ParseRule;
 
-#[derive(Copy, Clone)]
-pub enum ParseFn {
-    Unary,
-    Binary,
-    Grouping,
-    Number,
-}
+// !todo - Switch to idiomatic enum matching for dispactching correct parse function
+// #[derive(Copy, Clone)]
+// pub enum ParseFn {
+//     Unary,
+//     Binary,
+//     Grouping,
+//     Number,
+// }
 
-struct Parse_Rule {
-    infix: Option<ParseFn>,
-    prefix: Option<ParseFn>,
-    precedence: Precedence,
-}
+// struct Parse_Rule {
+//     infix: Option<ParseFn>,
+//     prefix: Option<ParseFn>,
+//     precedence: Precedence,
+// }
 
-impl Parse_Rule {
-    fn new(infix: Option<ParseFn>, prefix: Option<ParseFn>, precedence: Precedence) -> Parse_Rule {
-        Parse_Rule {
-            infix,
-            prefix,
-            precedence,
-        }
-    }
-    fn get_rule(token_type: TokenType) -> Parse_Rule {
-        use {Precedence::*, TokenType::*};
-        match token_type {
-            NUM => Parse_Rule::new(Some(ParseFn::Number), None, PrecNone),
-            PLUS => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
-            MINUS => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
-            DIV => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
+// impl Parse_Rule {
+//     fn new(infix: Option<ParseFn>, prefix: Option<ParseFn>, precedence: Precedence) -> Parse_Rule {
+//         Parse_Rule {
+//             infix,
+//             prefix,
+//             precedence,
+//         }
+//     }
+//     fn get_rule(token_type: TokenType) -> Parse_Rule {
+//         use {Precedence::*, TokenType::*};
+//         match token_type {
+//             NUM => Parse_Rule::new(Some(ParseFn::Number), None, PrecNone),
+//             PLUS => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
+//             MINUS => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
+//             DIV => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
 
-            _ => Parse_Rule::new(None, None, Precedence::PrecNone),
-        }
-    }
-}
+//             _ => Parse_Rule::new(None, None, Precedence::PrecNone),
+//         }
+//     }
+// }
 
-pub trait Parsable {
+trait Parsable {
     fn unary(&mut self);
 
     fn binary(&mut self);
@@ -62,7 +63,7 @@ pub trait Parsable {
     fn literal(&mut self);
 
     fn string(&mut self);
-    fn apply_parse_fn(&mut self, parse_fn: ParseFn);
+    // fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
     previous: Token,
@@ -78,7 +79,7 @@ impl Parsable for Parser<'_> {
         match operator_type {
             TokenType::MINUS => self.emit_opcode(Opcode::OPNEGATE),
             TokenType::NOT => self.emit_opcode(Opcode::OPNOT),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
@@ -100,10 +101,9 @@ impl Parsable for Parser<'_> {
             TokenType::EQ => self.emit_opcode(Opcode::OPEQ),
             // todo: use dedicated opcodes and implementations for double operators
             TokenType::GEQ => self.emit_opcodes(Opcode::OPLT, Opcode::OPNOT),
-            TokenType::LEQ => self.emit_opcodes(Opcode::OPGT , Opcode::OPNOT),
+            TokenType::LEQ => self.emit_opcodes(Opcode::OPGT, Opcode::OPNOT),
             TokenType::NEQ => self.emit_opcodes(Opcode::OPEQ, Opcode::OPNOT),
             _ => unreachable!(),
-            
         }
     }
 
@@ -128,7 +128,7 @@ impl Parsable for Parser<'_> {
             TokenType::NIL => {
                 self.emit_opcode(Opcode::OPNIL);
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
@@ -136,16 +136,50 @@ impl Parsable for Parser<'_> {
         let lexeme = self.previous.literal.clone();
         self.emit_constant(Value::STR(lexeme));
     }
-    fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
-        match parse_fn {
-            ParseFn::Binary => self.binary(),
-            ParseFn::Unary => self.unary(),
-            ParseFn::Grouping => self.grouping(),
-            ParseFn::Number => self.number(),
-        }
-    }
+    // fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
+    //     match parse_fn {
+    //         ParseFn::Binary => self.binary(),
+    //         ParseFn::Unary => self.unary(),
+    //         ParseFn::Grouping => self.grouping(),
+    //         ParseFn::Number => self.number(),
+    //     }
+    // }
 }
 
+pub trait Statement {
+    fn statement(&mut self);
+
+    fn print_statement(&mut self);
+
+    fn declaration(&mut self);
+}
+
+impl Statement for Parser<'_> {
+    fn statement(&mut self) {
+        if self.match_token(TokenType::PRINT) {
+            self.print_statement();
+        }
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::SEMICOLON, "Expected ';' after value");
+        self.emit_opcode(Opcode::OPPRINT);
+    }
+
+    fn declaration(&mut self) {
+        self.statement();
+    }
+}
+trait Expression {
+    fn expression(&mut self);
+}
+
+impl Expression for Parser<'_> {
+    fn expression(&mut self) {
+        self.parse_precendence(Precedence::PrecAssignment);
+    }
+}
 impl Parser<'_> {
     pub fn new(lexer: Lexer, chunk: &mut Chunk) -> Parser {
         let current = Token::new_def();
@@ -202,9 +236,18 @@ impl Parser<'_> {
             }
         }
     }
+    #[inline(always)]
+    fn check_token_type(&self, type_: TokenType) -> bool {
+        self.current.type_ == type_
+    }
 
-    fn expression(&mut self) {
-        self.parse_precendence(Precedence::PrecAssignment);
+    fn match_token(&mut self, type_: TokenType) -> bool {
+        if self.check_token_type(type_) {
+            self.advance();
+            true
+        } else {
+            false
+        }
     }
 
     fn end_compiler(&mut self) {
@@ -216,8 +259,12 @@ pub fn compile(source: String, chunk: &mut Chunk) -> Result<(), &'static str> {
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer, chunk);
     parser.advance();
-    parser.expression();
-    parser.consume(TokenType::EOF, "Expected EOF");
+
+    while !parser.match_token(TokenType::EOF) {
+        parser.declaration();
+    }
+    // parser.expression();
+    // parser.consume(TokenType::EOF, "Expected EOF");
     parser.end_compiler();
     // disassemble_chunk(chunk, "TEST");
     Ok(())
