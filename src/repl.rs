@@ -6,11 +6,11 @@ use crate::vm::Vm;
 
 pub fn start() {
     let mut rl = Editor::<()>::new();
+    let mut interpreter = Vm::init_vm();
     loop {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
-                let mut interpreter = Vm::init_vm();
                 interpreter.interpret(line);
             }
             Err(ReadlineError::Interrupted) => break,
@@ -19,12 +19,5 @@ pub fn start() {
                 panic!("{}", err);
             }
         }
-    }
-}
-
-fn lex(line: String) {
-    let lex = Lexer::new(line);
-    for tok in lex {
-        println!("{:?}", tok)
     }
 }

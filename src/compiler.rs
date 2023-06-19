@@ -63,6 +63,9 @@ trait Parsable {
     fn literal(&mut self);
 
     fn string(&mut self);
+
+    fn variable(&mut self);
+
     // fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
@@ -77,8 +80,8 @@ impl Parsable for Parser<'_> {
         let operator_type = self.previous.type_.clone();
         self.parse_precendence(Precedence::PrecUnary); // evaluate the operand
         match operator_type {
-            TokenType::MINUS => self.emit_opcode(Opcode::OPNEGATE),
-            TokenType::NOT => self.emit_opcode(Opcode::OPNOT),
+            TokenType::MINUS => self.emit_opcode(Opcode::OP_NEGATE),
+            TokenType::NOT => self.emit_opcode(Opcode::OP_NOT),
             _ => unreachable!(),
         }
     }
@@ -86,23 +89,25 @@ impl Parsable for Parser<'_> {
     fn binary(&mut self) {
         let operator_type = self.previous.type_.clone();
         let rule = parse_rule::ParseRule::get_rule(operator_type.clone());
-        if (rule.precedence as i8) < 11 {
+        if (rule.precedence as usize) < 11
+        /*variant count for Precedence; !todo - replace with variant_count::<Precedence>() once stabilized*/
+        {
             let next_precedence = unsafe { transmute(rule.precedence as i8 + 1) };
             self.parse_precendence(next_precedence);
         }
 
         match operator_type {
-            TokenType::PLUS => self.emit_opcode(Opcode::OPADD),
-            TokenType::MINUS => self.emit_opcode(Opcode::OPSUBSTRACT),
-            TokenType::MUL => self.emit_opcode(Opcode::OPMULTIPLY),
-            TokenType::DIV => self.emit_opcode(Opcode::OPDIVIDE),
-            TokenType::GT => self.emit_opcode(Opcode::OPGT),
-            TokenType::LT => self.emit_opcode(Opcode::OPLT),
-            TokenType::EQ => self.emit_opcode(Opcode::OPEQ),
+            TokenType::PLUS => self.emit_opcode(Opcode::OP_ADD),
+            TokenType::MINUS => self.emit_opcode(Opcode::OP_SUBSTRACT),
+            TokenType::MUL => self.emit_opcode(Opcode::OP_MULTIPLY),
+            TokenType::DIV => self.emit_opcode(Opcode::OP_DIVIDE),
+            TokenType::GT => self.emit_opcode(Opcode::OP_GT),
+            TokenType::LT => self.emit_opcode(Opcode::OP_LT),
+            TokenType::EQ => self.emit_opcode(Opcode::OP_EQ),
             // todo: use dedicated opcodes and implementations for double operators
-            TokenType::GEQ => self.emit_opcodes(Opcode::OPLT, Opcode::OPNOT),
-            TokenType::LEQ => self.emit_opcodes(Opcode::OPGT, Opcode::OPNOT),
-            TokenType::NEQ => self.emit_opcodes(Opcode::OPEQ, Opcode::OPNOT),
+            TokenType::GEQ => self.emit_opcodes(Opcode::OP_LT, Opcode::OP_NOT),
+            TokenType::LEQ => self.emit_opcodes(Opcode::OP_GT, Opcode::OP_NOT),
+            TokenType::NEQ => self.emit_opcodes(Opcode::OP_EQ, Opcode::OP_NOT),
             _ => unreachable!(),
         }
     }
@@ -120,13 +125,13 @@ impl Parsable for Parser<'_> {
     fn literal(&mut self) {
         match self.previous.type_ {
             TokenType::TRUE => {
-                self.emit_opcode(Opcode::OPTRUE);
+                self.emit_opcode(Opcode::OP_TRUE);
             }
             TokenType::FALSE => {
-                self.emit_opcode(Opcode::OPFALSE);
+                self.emit_opcode(Opcode::OP_FALSE);
             }
             TokenType::NIL => {
-                self.emit_opcode(Opcode::OPNIL);
+                self.emit_opcode(Opcode::OP_NIL);
             }
             _ => unreachable!(),
         }
@@ -135,6 +140,10 @@ impl Parsable for Parser<'_> {
     fn string(&mut self) {
         let lexeme = self.previous.literal.clone();
         self.emit_constant(Value::STR(lexeme));
+    }
+
+    fn variable(&mut self) {
+        self.named_variable();
     }
     // fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
     //     match parse_fn {
@@ -151,24 +160,54 @@ pub trait Statement {
 
     fn print_statement(&mut self);
 
+    fn expression_statement(&mut self);
+
     fn declaration(&mut self);
+
+    fn variable_declaration(&mut self);
 }
 
 impl Statement for Parser<'_> {
     fn statement(&mut self) {
         if self.match_token(TokenType::PRINT) {
             self.print_statement();
+        } else {
+            self.expression_statement();
         }
     }
 
     fn print_statement(&mut self) {
         self.expression();
         self.consume(TokenType::SEMICOLON, "Expected ';' after value");
-        self.emit_opcode(Opcode::OPPRINT);
+        self.emit_opcode(Opcode::OP_PRINT);
+    }
+
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::SEMICOLON, "Expected ; after expression");
+        self.emit_opcode(Opcode::OP_POP);
     }
 
     fn declaration(&mut self) {
-        self.statement();
+        if self.match_token(TokenType::LET) {
+            self.variable_declaration();
+        } else {
+            self.statement();
+        }
+    }
+
+    fn variable_declaration(&mut self) {
+        let global_idx = self.parse_variable("Expected variable name");
+        if self.match_token(TokenType::ASSIGN) {
+            self.expression();
+        } else {
+            self.emit_opcode(Opcode::OP_NIL);
+        }
+        self.consume(
+            TokenType::SEMICOLON,
+            "Expected ';' after variable declaration",
+        );
+        self.define_variable(global_idx);
     }
 }
 trait Expression {
@@ -216,7 +255,7 @@ impl Parser<'_> {
 
     fn emit_constant(&mut self, value: Value) {
         let idx = self.chunk.add_constant(value);
-        self.emit_opcode(Opcode::OPCONSTANT(idx));
+        self.emit_opcode(Opcode::OP_CONSTANT(idx));
     }
 
     fn parse_precendence(&mut self, precedence: Precedence) {
@@ -236,6 +275,8 @@ impl Parser<'_> {
             }
         }
     }
+
+    /* ====================== utils ========================== */
     #[inline(always)]
     fn check_token_type(&self, type_: TokenType) -> bool {
         self.current.type_ == type_
@@ -249,9 +290,26 @@ impl Parser<'_> {
             false
         }
     }
+    /* ==================== variable ========================= */
+    fn identifier_constant(&mut self, token: Token) -> usize {
+        self.chunk.add_constant(Value::STR(token.literal))
+    }
 
+    fn parse_variable(&mut self, err: &str) -> usize {
+        self.consume(TokenType::IDENT, err);
+        self.identifier_constant(self.previous.clone())
+    }
+
+    fn define_variable(&mut self, idx: usize) {
+        self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
+    }
+
+    fn named_variable(&mut self) {
+        let idx = self.identifier_constant(self.previous.clone());
+        self.emit_opcode(Opcode::OP_GET_GLOBAL(idx));
+    }
     fn end_compiler(&mut self) {
-        self.emit_opcode(Opcode::OPRETURN);
+        self.emit_opcode(Opcode::OP_RETURN);
     }
 }
 

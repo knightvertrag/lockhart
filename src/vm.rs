@@ -1,4 +1,4 @@
-use std::thread::panicking;
+use std::{thread::panicking, collections::HashMap};
 
 use crate::{
     bytecode::Opcode,
@@ -12,6 +12,7 @@ pub struct Vm {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    globals: HashMap<String, Value>,
 }
 
 macro_rules! binary_op {
@@ -42,6 +43,7 @@ impl Vm {
             chunk,
             ip,
             stack: Vec::<Value>::new(),
+            globals: HashMap::new(),
         }
     }
 
@@ -51,21 +53,21 @@ impl Vm {
     }
 
     fn run(&mut self) -> InterpretResult {
-        for _i in 0..self.chunk.code.len() {
+        loop {
             // disassemble_instruction(&self.chunk, _i);
 
             match self.chunk.code[self.ip].0 {
-                Opcode::OPRETURN => {
-                    // self.stack.pop();
-                    break;
+                Opcode::OP_RETURN => {
+                    self.ip += 1;
+                    return InterpretResult::InterpretOk;
                 }
-                Opcode::OPCONSTANT(idx) => {
+                Opcode::OP_CONSTANT(idx) => {
                     let constant = self.read_constant(idx);
                     // println!("{:?}", constant);
                     self.stack.push(constant);
                     // return InterpretResult::InterpretOk;
                 }
-                Opcode::OPNEGATE => {
+                Opcode::OP_NEGATE => {
                     let to_negate = self.peek(0);
                     if let Value::NUMBER(mut n) = to_negate {
                         n = -n;
@@ -76,7 +78,7 @@ impl Vm {
                         panic!("Cannot negate a non-number value");
                     }
                 }
-                Opcode::OPADD => {
+                Opcode::OP_ADD => {
                     let (x, y) = (self.peek(0), self.peek(1));
                     if let (Value::STR(s1), Value::STR(s2)) = (x, y) {
                         let concatenated = s2.to_owned() + s1;
@@ -91,49 +93,64 @@ impl Vm {
 
                     // println!("{:?}", self.peek());
                 }
-                Opcode::OPSUBSTRACT => {
+                Opcode::OP_SUBSTRACT => {
                     binary_op!(NUMBER, -, self);
                     // println!("{:?}", self.peek());
                 }
-                Opcode::OPDIVIDE => {
+                Opcode::OP_DIVIDE => {
                     binary_op!(NUMBER, /, self);
                     // println!("{:?}", self.peek());
                 }
-                Opcode::OPMULTIPLY => {
+                Opcode::OP_MULTIPLY => {
                     binary_op!(NUMBER, *, self);
                     // println!("{:?}", self.peek())
                 }
-                Opcode::OPMOD => {
+                Opcode::OP_MOD => {
                     binary_op!(NUMBER, %, self);
                     // println!("{:?}", self.peek())
                 }
-                Opcode::OPTRUE => self.stack.push(Value::BOOL(true)),
-                Opcode::OPFALSE => self.stack.push(Value::BOOL(false)),
-                Opcode::OPNIL => self.stack.push(Value::NIL),
-                Opcode::OPNOT => {
+                Opcode::OP_TRUE => self.stack.push(Value::BOOL(true)),
+                Opcode::OP_FALSE => self.stack.push(Value::BOOL(false)),
+                Opcode::OP_NIL => self.stack.push(Value::NIL),
+                Opcode::OP_NOT => {
                     let falsified = Value::BOOL(Value::falsify(&self.stack.pop().unwrap()));
                     self.stack.push(falsified);
                 }
-                Opcode::OPEQ => {
+                Opcode::OP_EQ => {
                     let a = self.stack.pop().unwrap();
                     let b = self.stack.pop().unwrap();
                     self.stack.push(Value::BOOL(Value::values_equal(&a, &b)));
                 }
-                Opcode::OPGT => {
+                Opcode::OP_GT => {
                     binary_op!(BOOL, >, self);
                 }
-                Opcode::OPLT => {
+                Opcode::OP_LT => {
                     binary_op!(BOOL, <, self);
                 }
-                Opcode::OPPRINT => {
+                Opcode::OP_PRINT => {
                     let val = self.stack.pop().unwrap();
                     println!("{}", val);
+                },
+                Opcode::OP_POP => {
+                    self.stack.pop();
+                },
+                Opcode::OP_DEFINE_GLOBAL(idx) => {
+                    let name = self.read_constant(idx).get_string().unwrap().to_owned();
+                    let value = self.stack.pop().unwrap();
+                    self.globals.insert(name , value);
+                },
+                Opcode::OP_GET_GLOBAL(idx) => {
+                    let name = self.read_constant(idx).get_string().unwrap().to_owned();
+                    if let Some(value) = self.globals.get(&name) {
+                        self.stack.push(value.clone());
+                    } else {
+                        return InterpretResult::InterpretCompileError;
+                    }
                 },
             }
             self.ip += 1;
         }
         // println!("{:?}", self.peek(0));
-        InterpretResult::InterpretOk
     }
 
     fn peek(&self, idx: usize) -> &Value {

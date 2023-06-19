@@ -17,14 +17,6 @@ impl Chunk {
         }
     }
 
-    // pub fn add_constant_double(&mut self, value: f64) -> usize {
-    //     self.add_constant(Value::NUMBER(value))
-    // }
-
-    // pub fn add_constant_string(&mut self, value: String) -> usize {
-    //     self.add_constant(Constant::STRING(value))
-    // }
-
     pub fn add_constant(&mut self, value: Value) -> usize {
         self.constants.push(value);
         self.constants.len() - 1

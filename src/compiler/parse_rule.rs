@@ -35,7 +35,7 @@ pub static RULES: [ParseRule; 32] = {
         infix: None,
         precedence: PrecNone,
     }; 32];
-    rule!(a, IDENT, None, None, PrecNone);
+    rule!(a, IDENT, Some(|x| x.variable()), None, PrecNone);
     rule!(a, NUM, Some(|x| x.number()), None, PrecNone);
     rule!(a, STRING, Some(|x| x.string()), None, PrecNone);
     rule!(a, LET, None, None, PrecNone);
