@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Error, mem::transmute, rc::Rc};
+use std::{cell::RefCell, fmt::Error, mem::transmute, rc::Rc, thread::panicking};
 
 use crate::{
     bytecode::Opcode,
@@ -52,19 +52,19 @@ use parse_rule::ParseRule;
 // }
 
 trait Parsable {
-    fn unary(&mut self);
+    fn unary(&mut self, _: bool);
 
-    fn binary(&mut self);
+    fn binary(&mut self, _: bool);
 
-    fn grouping(&mut self);
+    fn grouping(&mut self, _: bool);
 
-    fn number(&mut self);
+    fn number(&mut self, _: bool);
 
-    fn literal(&mut self);
+    fn literal(&mut self, _: bool);
 
-    fn string(&mut self);
+    fn string(&mut self, _: bool);
 
-    fn variable(&mut self);
+    fn variable(&mut self, _: bool);
 
     // fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
@@ -76,9 +76,9 @@ pub struct Parser<'a> {
 }
 
 impl Parsable for Parser<'_> {
-    fn unary(&mut self) {
+    fn unary(&mut self, _: bool) {
         let operator_type = self.previous.type_.clone();
-        self.parse_precendence(Precedence::PrecUnary); // evaluate the operand
+        self.parse_precedence(Precedence::PrecUnary); // evaluate the operand
         match operator_type {
             TokenType::MINUS => self.emit_opcode(Opcode::OP_NEGATE),
             TokenType::NOT => self.emit_opcode(Opcode::OP_NOT),
@@ -86,14 +86,14 @@ impl Parsable for Parser<'_> {
         }
     }
 
-    fn binary(&mut self) {
+    fn binary(&mut self, _: bool) {
         let operator_type = self.previous.type_.clone();
         let rule = parse_rule::ParseRule::get_rule(operator_type.clone());
         if (rule.precedence as usize) < 11
         /*variant count for Precedence; !todo - replace with variant_count::<Precedence>() once stabilized*/
         {
             let next_precedence = unsafe { transmute(rule.precedence as i8 + 1) };
-            self.parse_precendence(next_precedence);
+            self.parse_precedence(next_precedence);
         }
 
         match operator_type {
@@ -112,17 +112,17 @@ impl Parsable for Parser<'_> {
         }
     }
 
-    fn grouping(&mut self) {
+    fn grouping(&mut self, _: bool) {
         self.expression(); // recursively evaluate the expression between the parenthesis
         self.consume(TokenType::RPAREN, "Expected )");
     }
 
-    fn number(&mut self) {
+    fn number(&mut self, _:bool) {
         let value = Value::NUMBER(self.previous.literal.parse::<f64>().unwrap());
         self.emit_constant(value);
     }
 
-    fn literal(&mut self) {
+    fn literal(&mut self, _:bool) {
         match self.previous.type_ {
             TokenType::TRUE => {
                 self.emit_opcode(Opcode::OP_TRUE);
@@ -137,13 +137,13 @@ impl Parsable for Parser<'_> {
         }
     }
 
-    fn string(&mut self) {
+    fn string(&mut self, _:bool) {
         let lexeme = self.previous.literal.clone();
         self.emit_constant(Value::STR(lexeme));
     }
 
-    fn variable(&mut self) {
-        self.named_variable();
+    fn variable(&mut self, can_assign :bool) {
+        self.named_variable(can_assign);
     }
     // fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
     //     match parse_fn {
@@ -216,7 +216,7 @@ trait Expression {
 
 impl Expression for Parser<'_> {
     fn expression(&mut self) {
-        self.parse_precendence(Precedence::PrecAssignment);
+        self.parse_precedence(Precedence::PrecAssignment);
     }
 }
 impl Parser<'_> {
@@ -258,21 +258,24 @@ impl Parser<'_> {
         self.emit_opcode(Opcode::OP_CONSTANT(idx));
     }
 
-    fn parse_precendence(&mut self, precedence: Precedence) {
+    fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
         let prefix_rule = RULES[self.previous.type_.clone() as usize];
+        let can_assign = precedence <= Precedence::PrecAssignment;
         if let Some(prefix_fn) = prefix_rule.prefix {
-            prefix_fn(self);
+            prefix_fn(self, can_assign);
         } else {
             panic!("error unexpected token");
         }
-
         while precedence <= ParseRule::get_rule(self.current.clone().type_).precedence {
             self.advance();
-            let infix_rule_option = ParseRule::get_rule(self.previous.clone().type_).infix;
-            if let Some(infix_rule) = infix_rule_option {
-                infix_rule(self);
+            if let Some(infix_rule) = ParseRule::get_rule(self.previous.clone().type_).infix {
+                infix_rule(self, can_assign);
             }
+        }
+
+        if can_assign && self.match_token(TokenType::ASSIGN) {
+            panic!("Invalid Assignment target");
         }
     }
 
@@ -304,9 +307,9 @@ impl Parser<'_> {
         self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
     }
 
-    fn named_variable(&mut self) {
+    fn named_variable(&mut self, can_assign: bool) {
         let idx = self.identifier_constant(self.previous.clone());
-        if self.match_token(TokenType::ASSIGN) {
+        if can_assign && self.match_token(TokenType::ASSIGN) {
             self.expression();
             self.emit_opcode(Opcode::OP_SET_GLOBAL(idx));
         } else {
