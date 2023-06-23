@@ -1,4 +1,4 @@
-use std::{thread::panicking, collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{
     bytecode::Opcode,
@@ -29,10 +29,10 @@ macro_rules! binary_op {
     }
 }
 
-pub enum InterpretResult {
-    InterpretOk,
-    InterpretCompileError,
-    InterpretRuntimeError,
+#[derive(Debug)]
+pub enum InterpretError {
+    InterpretCompileError(&'static str),
+    InterpretRuntimeError(&'static str),
 }
 
 impl Vm {
@@ -47,19 +47,19 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, source: String) -> InterpretResult {
+    pub fn interpret(&mut self, source: String) -> Result<(), InterpretError> {
         compile(source, &mut self.chunk).unwrap();
         return self.run();
     }
 
-    fn run(&mut self) -> InterpretResult {
+    fn run(&mut self) -> Result<(), InterpretError> {
         loop {
             // disassemble_instruction(&self.chunk, _i);
 
             match self.chunk.code[self.ip].0 {
                 Opcode::OP_RETURN => {
                     self.ip += 1;
-                    return InterpretResult::InterpretOk;
+                    return Ok(());
                 }
                 Opcode::OP_CONSTANT(idx) => {
                     let constant = self.read_constant(idx);
@@ -75,7 +75,9 @@ impl Vm {
                         self.stack.push(Value::NUMBER(n));
                         println!("{:?}", self.peek(0));
                     } else {
-                        panic!("Cannot negate a non-number value");
+                        return Err(InterpretError::InterpretRuntimeError(
+                            "Failed to negate non-number value",
+                        ));
                     }
                 }
                 Opcode::OP_ADD => {
@@ -88,7 +90,9 @@ impl Vm {
                     } else if let (Value::NUMBER(_), Value::NUMBER(_)) = (x, y) {
                         binary_op!(NUMBER, +, self);
                     } else {
-                        panic!("Failure to add, operation must be between Strings or Numbers");
+                        return Err(InterpretError::InterpretRuntimeError(
+                            "Failed to add non-number values",
+                        ));
                     }
 
                     // println!("{:?}", self.peek());
@@ -130,23 +134,32 @@ impl Vm {
                 Opcode::OP_PRINT => {
                     let val = self.stack.pop().unwrap();
                     println!("{}", val);
-                },
+                }
                 Opcode::OP_POP => {
                     self.stack.pop();
-                },
+                }
                 Opcode::OP_DEFINE_GLOBAL(idx) => {
                     let name = self.read_constant(idx).get_string().unwrap().to_owned();
                     let value = self.stack.pop().unwrap();
-                    self.globals.insert(name , value);
-                },
+                    self.globals.insert(name, value);
+                }
                 Opcode::OP_GET_GLOBAL(idx) => {
                     let name = self.read_constant(idx).get_string().unwrap().to_owned();
                     if let Some(value) = self.globals.get(&name) {
                         self.stack.push(value.clone());
                     } else {
-                        return InterpretResult::InterpretCompileError;
+                        return Err(InterpretError::InterpretRuntimeError("Undefined Variable"));
                     }
-                },
+                }
+                Opcode::OP_SET_GLOBAL(idx) => {
+                    let name = self.read_constant(idx).get_string().unwrap().to_owned();
+                    if self.globals.contains_key(&name) {
+                        let value = self.peek(0);
+                        self.globals.insert(name, value.clone());
+                    } else {
+                        return Err(InterpretError::InterpretRuntimeError("Undefined Variable"));
+                    }
+                }
             }
             self.ip += 1;
         }

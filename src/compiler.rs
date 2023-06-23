@@ -230,7 +230,7 @@ impl Parser<'_> {
             chunk,
         }
     }
-
+    /* ======================= plumbing ====================== */
     fn advance(&mut self) {
         self.previous = self.current.clone();
         self.current = self.lexer.next_token();
@@ -306,7 +306,12 @@ impl Parser<'_> {
 
     fn named_variable(&mut self) {
         let idx = self.identifier_constant(self.previous.clone());
-        self.emit_opcode(Opcode::OP_GET_GLOBAL(idx));
+        if self.match_token(TokenType::ASSIGN) {
+            self.expression();
+            self.emit_opcode(Opcode::OP_SET_GLOBAL(idx));
+        } else {
+            self.emit_opcode(Opcode::OP_GET_GLOBAL(idx));
+        }
     }
     fn end_compiler(&mut self) {
         self.emit_opcode(Opcode::OP_RETURN);

@@ -23,6 +23,7 @@ pub enum Opcode {
     // declarations
     OP_DEFINE_GLOBAL(usize),
     OP_GET_GLOBAL(usize),
+    OP_SET_GLOBAL(usize),
     OP_PRINT,
     OP_POP,
 }

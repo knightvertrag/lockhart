@@ -17,7 +17,16 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) {
     print!("{:?} ", lineno);
     match opcode {
         Opcode::OP_CONSTANT(idx) => {
-            constant_instruction("OPCONSTANT", &chunk, idx, offset);
+            constant_instruction("OP_CONSTANT", &chunk, idx, offset);
+        }
+        Opcode::OP_DEFINE_GLOBAL(idx) => {
+            constant_instruction("OP_DEFINE_GLOBAL", &chunk, idx, offset);
+        }
+        Opcode::OP_GET_GLOBAL(idx) => {
+            constant_instruction("OP_GET_GLOBAL", &chunk, idx, offset);
+        }
+        Opcode::OP_SET_GLOBAL(idx) => {
+            constant_instruction("OP_SET_GLOBAL", &chunk, idx, offset);
         }
         _ => {
             println!("{:?}", opcode);
