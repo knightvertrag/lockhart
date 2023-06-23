@@ -1,7 +1,5 @@
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-
-use crate::lexer::Lexer;
 use crate::vm::Vm;
 
 pub fn start() {
@@ -11,7 +9,9 @@ pub fn start() {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
-                interpreter.interpret(line);
+                interpreter.interpret(line).unwrap_or_else(|err| {
+                    println!("{:?}", err);
+                });
             }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
