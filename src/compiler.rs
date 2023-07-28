@@ -15,42 +15,6 @@ mod precedence;
 
 use parse_rule::ParseRule;
 
-// !todo - Switch to idiomatic enum matching for dispactching correct parse function
-// #[derive(Copy, Clone)]
-// pub enum ParseFn {
-//     Unary,
-//     Binary,
-//     Grouping,
-//     Number,
-// }
-
-// struct Parse_Rule {
-//     infix: Option<ParseFn>,
-//     prefix: Option<ParseFn>,
-//     precedence: Precedence,
-// }
-
-// impl Parse_Rule {
-//     fn new(infix: Option<ParseFn>, prefix: Option<ParseFn>, precedence: Precedence) -> Parse_Rule {
-//         Parse_Rule {
-//             infix,
-//             prefix,
-//             precedence,
-//         }
-//     }
-//     fn get_rule(token_type: TokenType) -> Parse_Rule {
-//         use {Precedence::*, TokenType::*};
-//         match token_type {
-//             NUM => Parse_Rule::new(Some(ParseFn::Number), None, PrecNone),
-//             PLUS => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
-//             MINUS => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
-//             DIV => Parse_Rule::new(Some(ParseFn::Binary), None, PrecTerm),
-
-//             _ => Parse_Rule::new(None, None, Precedence::PrecNone),
-//         }
-//     }
-// }
-
 trait Parsable {
     fn unary(&mut self, _: bool);
 
@@ -145,80 +109,8 @@ impl Parsable for Parser<'_> {
     fn variable(&mut self, can_assign :bool) {
         self.named_variable(can_assign);
     }
-    // fn apply_parse_fn(&mut self, parse_fn: ParseFn) {
-    //     match parse_fn {
-    //         ParseFn::Binary => self.binary(),
-    //         ParseFn::Unary => self.unary(),
-    //         ParseFn::Grouping => self.grouping(),
-    //         ParseFn::Number => self.number(),
-    //     }
-    // }
 }
 
-pub trait Statement {
-    fn statement(&mut self);
-
-    fn print_statement(&mut self);
-
-    fn expression_statement(&mut self);
-
-    fn declaration(&mut self);
-
-    fn variable_declaration(&mut self);
-}
-
-impl Statement for Parser<'_> {
-    fn statement(&mut self) {
-        if self.match_token(TokenType::PRINT) {
-            self.print_statement();
-        } else {
-            self.expression_statement();
-        }
-    }
-
-    fn print_statement(&mut self) {
-        self.expression();
-        self.consume(TokenType::SEMICOLON, "Expected ';' after value");
-        self.emit_opcode(Opcode::OP_PRINT);
-    }
-
-    fn expression_statement(&mut self) {
-        self.expression();
-        self.consume(TokenType::SEMICOLON, "Expected ; after expression");
-        self.emit_opcode(Opcode::OP_POP);
-    }
-
-    fn declaration(&mut self) {
-        if self.match_token(TokenType::LET) {
-            self.variable_declaration();
-        } else {
-            self.statement();
-        }
-    }
-
-    fn variable_declaration(&mut self) {
-        let global_idx = self.parse_variable("Expected variable name");
-        if self.match_token(TokenType::ASSIGN) {
-            self.expression();
-        } else {
-            self.emit_opcode(Opcode::OP_NIL);
-        }
-        self.consume(
-            TokenType::SEMICOLON,
-            "Expected ';' after variable declaration",
-        );
-        self.define_variable(global_idx);
-    }
-}
-trait Expression {
-    fn expression(&mut self);
-}
-
-impl Expression for Parser<'_> {
-    fn expression(&mut self) {
-        self.parse_precedence(Precedence::PrecAssignment);
-    }
-}
 impl Parser<'_> {
     pub fn new(lexer: Lexer, chunk: &mut Chunk) -> Parser {
         let current = Token::new_def();
@@ -293,6 +185,53 @@ impl Parser<'_> {
             false
         }
     }
+    /* ==================== statement ======================== */
+    fn statement(&mut self) {
+        if self.match_token(TokenType::PRINT) {
+            self.print_statement();
+        } else {
+            self.expression_statement();
+        }
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::SEMICOLON, "Expected ';' after value");
+        self.emit_opcode(Opcode::OP_PRINT);
+    }
+
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::SEMICOLON, "Expected ; after expression");
+        self.emit_opcode(Opcode::OP_POP);
+    }
+
+    fn declaration(&mut self) {
+        if self.match_token(TokenType::LET) {
+            self.variable_declaration();
+        } else {
+            self.statement();
+        }
+    }
+
+    fn variable_declaration(&mut self) {
+        let global_idx = self.parse_variable("Expected variable name");
+        if self.match_token(TokenType::ASSIGN) {
+            self.expression();
+        } else {
+            self.emit_opcode(Opcode::OP_NIL);
+        }
+        self.consume(
+            TokenType::SEMICOLON,
+            "Expected ';' after variable declaration",
+        );
+        self.define_variable(global_idx);
+    }
+
+    fn expression(&mut self) {
+        self.parse_precedence(Precedence::PrecAssignment);
+    }
+
     /* ==================== variable ========================= */
     fn identifier_constant(&mut self, token: Token) -> usize {
         self.chunk.add_constant(Value::STR(token.literal))
