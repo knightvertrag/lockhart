@@ -11,7 +11,7 @@ use crate::{
     bytecode::Opcode,
     chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
     lexer::{self, Lexer},
-    token::{Token, TokenType},
+    token::{Token, TokenType, self},
     value::Value,
 };
 
@@ -251,11 +251,19 @@ impl Parser<'_> {
     }
 
     fn end_scope(&mut self) {
-        let curr = self.compiler.locals.len();
+        let mut popped = 0;
+        for (_, scopes) in &mut self.compiler.locals {
+            for i in (0..scopes.len()).rev() {
+                if scopes[i].0 == self.compiler.scope_depth {
+                    popped += 1;
+                    self.compiler.total -= 1;
+                    scopes.pop();
+                }
+            }
+        }
         self.compiler
             .locals
-            .retain(|local, _| local.depth < self.compiler.scope_depth);
-        let popped = curr - self.compiler.locals.len();
+            .retain(|_, v| v.len() > 0);
         self.compiler.scope_depth -= 1;
         for _ in 0..popped {
             self.emit_opcode(Opcode::OP_POP);
@@ -278,29 +286,25 @@ impl Parser<'_> {
         if self.compiler.scope_depth == 0 {
             return;
         }
-        let local = Local {
-            name: self.previous.clone(),
-            depth: self.compiler.scope_depth,
-        };
-        if self.compiler.locals.contains_key(&local) {
-            panic!("Variable of name :{} already exists", local.name.literal);
+        if self.compiler.locals.contains_key(&self.previous) && self.compiler.locals[&self.previous].last().unwrap().0 == self.compiler.scope_depth {
+            panic!("Variable of name :{} already exists", &self.previous.literal);
         }
         self.add_local(self.previous.clone());
     }
 
-    fn add_local(&mut self, name: Token) {
-        let local = Local {
-            name,
-            depth: self.compiler.scope_depth,
-        };
-        self.compiler
-            .locals
-            .insert(local, self.compiler.locals.len());
+    fn add_local(&mut self, token: Token) {
+        if self.compiler.locals.contains_key(&token) {
+            (*self.compiler.locals.get_mut(&token).unwrap()).push((self.compiler.scope_depth, self.compiler.total));
+        } else {
+            let v = vec![(self.compiler.scope_depth, self.compiler.total)];
+            self.compiler.locals.insert(token, v);
+        }
+        self.compiler.total += 1;
     }
 
-    fn resolve_local(&mut self, local: &Local) -> Option<usize> {
-        if self.compiler.locals.contains_key(local) {
-            return self.compiler.locals.get(local).copied();
+    fn resolve_local(&self, token: &Token) -> Option<i8> {
+        if self.compiler.locals.contains_key(token) {
+            return Some(self.compiler.locals[token].last().unwrap().1);
         }
         None
     }
@@ -324,15 +328,11 @@ impl Parser<'_> {
     fn named_variable(&mut self, can_assign: bool) {
         let get_op: Opcode;
         let set_op: Opcode;
-        let local = Local {
-            name: self.previous.clone(),
-            depth: self.compiler.scope_depth,
-        };
-        let slot = self.resolve_local(&local);
+        let slot = self.resolve_local(&self.previous);
         match slot {
             Some(slot_index) => {
-                get_op = Opcode::OP_GET_LOCAL(slot_index);
-                set_op = Opcode::OP_SET_LOCAL(slot_index);
+                get_op = Opcode::OP_GET_LOCAL(slot_index.try_into().unwrap());
+                set_op = Opcode::OP_SET_LOCAL(slot_index.try_into().unwrap());
             }
             _ => {
                 let idx = self.identifier_constant(self.previous.clone());
@@ -358,8 +358,9 @@ struct Local {
     depth: i8,
 }
 struct Compiler {
-    locals: HashMap<Local, usize>,
+    locals: HashMap<Token, Vec<(i8, i8)>>,
     scope_depth: i8,
+    total: i8,
 }
 
 impl Compiler {
@@ -367,6 +368,7 @@ impl Compiler {
         Compiler {
             locals: HashMap::new(),
             scope_depth: 0,
+            total: 0,
         }
     }
 }
