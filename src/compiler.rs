@@ -1,4 +1,11 @@
-use std::{cell::RefCell, fmt::Error, mem::transmute, rc::Rc, thread::panicking};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    fmt::Error,
+    mem::transmute,
+    rc::Rc,
+    thread::panicking,
+};
 
 use crate::{
     bytecode::Opcode,
@@ -37,6 +44,7 @@ pub struct Parser<'a> {
     current: Token,
     lexer: Lexer,
     chunk: &'a mut Chunk,
+    compiler: Compiler,
 }
 
 impl Parsable for Parser<'_> {
@@ -81,12 +89,12 @@ impl Parsable for Parser<'_> {
         self.consume(TokenType::RPAREN, "Expected )");
     }
 
-    fn number(&mut self, _:bool) {
+    fn number(&mut self, _: bool) {
         let value = Value::NUMBER(self.previous.literal.parse::<f64>().unwrap());
         self.emit_constant(value);
     }
 
-    fn literal(&mut self, _:bool) {
+    fn literal(&mut self, _: bool) {
         match self.previous.type_ {
             TokenType::TRUE => {
                 self.emit_opcode(Opcode::OP_TRUE);
@@ -101,12 +109,12 @@ impl Parsable for Parser<'_> {
         }
     }
 
-    fn string(&mut self, _:bool) {
+    fn string(&mut self, _: bool) {
         let lexeme = self.previous.literal.clone();
         self.emit_constant(Value::STR(lexeme));
     }
 
-    fn variable(&mut self, can_assign :bool) {
+    fn variable(&mut self, can_assign: bool) {
         self.named_variable(can_assign);
     }
 }
@@ -115,11 +123,13 @@ impl Parser<'_> {
     pub fn new(lexer: Lexer, chunk: &mut Chunk) -> Parser {
         let current = Token::new_def();
         let previous = Token::new_def();
+        let compiler = Compiler::new();
         Parser {
             previous,
             current,
             lexer,
             chunk,
+            compiler,
         }
     }
     /* ======================= plumbing ====================== */
@@ -189,6 +199,10 @@ impl Parser<'_> {
     fn statement(&mut self) {
         if self.match_token(TokenType::PRINT) {
             self.print_statement();
+        } else if self.match_token(TokenType::LBRACE) {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
         } else {
             self.expression_statement();
         }
@@ -231,28 +245,106 @@ impl Parser<'_> {
     fn expression(&mut self) {
         self.parse_precedence(Precedence::PrecAssignment);
     }
+    /* ==================== blocks =========================== */
+    fn begin_scope(&mut self) {
+        self.compiler.scope_depth += 1;
+    }
 
+    fn end_scope(&mut self) {
+        let curr = self.compiler.locals.len();
+        self.compiler
+            .locals
+            .retain(|local, _| local.depth < self.compiler.scope_depth);
+        let popped = curr - self.compiler.locals.len();
+        self.compiler.scope_depth -= 1;
+        for _ in 0..popped {
+            self.emit_opcode(Opcode::OP_POP);
+        }
+    }
+
+    fn block(&mut self) {
+        while !self.check_token_type(TokenType::RBRACE) && !self.check_token_type(TokenType::EOF) {
+            self.declaration();
+        }
+
+        self.consume(TokenType::RBRACE, "Expected } at end of block");
+    }
     /* ==================== variable ========================= */
     fn identifier_constant(&mut self, token: Token) -> usize {
         self.chunk.add_constant(Value::STR(token.literal))
     }
 
+    fn declare_variable(&mut self) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
+        let local = Local {
+            name: self.previous.clone(),
+            depth: self.compiler.scope_depth,
+        };
+        if self.compiler.locals.contains_key(&local) {
+            panic!("Variable of name :{} already exists", local.name.literal);
+        }
+        self.add_local(self.previous.clone());
+    }
+
+    fn add_local(&mut self, name: Token) {
+        let local = Local {
+            name,
+            depth: self.compiler.scope_depth,
+        };
+        self.compiler
+            .locals
+            .insert(local, self.compiler.locals.len());
+    }
+
+    fn resolve_local(&mut self, local: &Local) -> Option<usize> {
+        if self.compiler.locals.contains_key(local) {
+            return self.compiler.locals.get(local).copied();
+        }
+        None
+    }
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::IDENT, err);
+
+        self.declare_variable();
+        if self.compiler.scope_depth > 0 {
+            return 0;
+        }
         self.identifier_constant(self.previous.clone())
     }
 
     fn define_variable(&mut self, idx: usize) {
+        if self.compiler.scope_depth > 0 {
+            return;
+        }
         self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
     }
 
     fn named_variable(&mut self, can_assign: bool) {
-        let idx = self.identifier_constant(self.previous.clone());
+        let get_op: Opcode;
+        let set_op: Opcode;
+        let local = Local {
+            name: self.previous.clone(),
+            depth: self.compiler.scope_depth,
+        };
+        let slot = self.resolve_local(&local);
+        match slot {
+            Some(slot_index) => {
+                get_op = Opcode::OP_GET_LOCAL(slot_index);
+                set_op = Opcode::OP_SET_LOCAL(slot_index);
+            }
+            _ => {
+                let idx = self.identifier_constant(self.previous.clone());
+                get_op = Opcode::OP_GET_GLOBAL(idx);
+                set_op = Opcode::OP_SET_GLOBAL(idx);
+            }
+        }
         if can_assign && self.match_token(TokenType::ASSIGN) {
             self.expression();
-            self.emit_opcode(Opcode::OP_SET_GLOBAL(idx));
+            self.emit_opcode(set_op);
         } else {
-            self.emit_opcode(Opcode::OP_GET_GLOBAL(idx));
+            self.emit_opcode(get_op);
         }
     }
     fn end_compiler(&mut self) {
@@ -260,6 +352,24 @@ impl Parser<'_> {
     }
 }
 
+#[derive(Eq, PartialEq, Hash)]
+struct Local {
+    name: Token,
+    depth: i8,
+}
+struct Compiler {
+    locals: HashMap<Local, usize>,
+    scope_depth: i8,
+}
+
+impl Compiler {
+    fn new() -> Self {
+        Compiler {
+            locals: HashMap::new(),
+            scope_depth: 0,
+        }
+    }
+}
 pub fn compile(source: String, chunk: &mut Chunk) -> Result<(), &'static str> {
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer, chunk);

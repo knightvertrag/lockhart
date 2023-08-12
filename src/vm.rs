@@ -160,6 +160,12 @@ impl Vm {
                         return Err(InterpretError::InterpretRuntimeError("Undefined Variable"));
                     }
                 }
+                Opcode::OP_GET_LOCAL(slot_index) => {
+                    self.stack.push(self.stack[slot_index].clone());
+                },
+                Opcode::OP_SET_LOCAL(slot_index) => {
+                    self.stack[slot_index] = self.peek(0).clone();
+                },
             }
             self.ip += 1;
         }

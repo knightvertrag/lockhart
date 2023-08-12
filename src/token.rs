@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum TokenType {
     IDENT,
     NUM,
@@ -36,12 +36,19 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
     pub literal: String,
     pub lineno: usize,
 }
+
+impl std::hash::Hash for Token {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.literal.hash(state);
+    }
+}
+
 
 impl Token {
     pub fn new(type_: TokenType, literal: String, lineno: usize) -> Token {

@@ -24,6 +24,8 @@ pub enum Opcode {
     OP_DEFINE_GLOBAL(usize),
     OP_GET_GLOBAL(usize),
     OP_SET_GLOBAL(usize),
+    OP_GET_LOCAL(usize),
+    OP_SET_LOCAL(usize),
     OP_PRINT,
     OP_POP,
 }
