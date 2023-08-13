@@ -11,7 +11,7 @@ use crate::{
     bytecode::Opcode,
     chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
     lexer::{self, Lexer},
-    token::{Token, TokenType, self},
+    token::{self, Token, TokenType},
     value::Value,
 };
 
@@ -230,6 +230,7 @@ impl Parser<'_> {
 
     fn variable_declaration(&mut self) {
         let global_idx = self.parse_variable("Expected variable name");
+        let var_token = self.previous.clone();
         if self.match_token(TokenType::ASSIGN) {
             self.expression();
         } else {
@@ -239,7 +240,7 @@ impl Parser<'_> {
             TokenType::SEMICOLON,
             "Expected ';' after variable declaration",
         );
-        self.define_variable(global_idx);
+        self.define_variable(global_idx, &var_token);
     }
 
     fn expression(&mut self) {
@@ -261,9 +262,7 @@ impl Parser<'_> {
                 }
             }
         }
-        self.compiler
-            .locals
-            .retain(|_, v| v.len() > 0);
+        self.compiler.locals.retain(|_, v| v.len() > 0);
         self.compiler.scope_depth -= 1;
         for _ in 0..popped {
             self.emit_opcode(Opcode::OP_POP);
@@ -282,32 +281,6 @@ impl Parser<'_> {
         self.chunk.add_constant(Value::STR(token.literal))
     }
 
-    fn declare_variable(&mut self) {
-        if self.compiler.scope_depth == 0 {
-            return;
-        }
-        if self.compiler.locals.contains_key(&self.previous) && self.compiler.locals[&self.previous].last().unwrap().0 == self.compiler.scope_depth {
-            panic!("Variable of name :{} already exists", &self.previous.literal);
-        }
-        self.add_local(self.previous.clone());
-    }
-
-    fn add_local(&mut self, token: Token) {
-        if self.compiler.locals.contains_key(&token) {
-            (*self.compiler.locals.get_mut(&token).unwrap()).push((self.compiler.scope_depth, self.compiler.total));
-        } else {
-            let v = vec![(self.compiler.scope_depth, self.compiler.total)];
-            self.compiler.locals.insert(token, v);
-        }
-        self.compiler.total += 1;
-    }
-
-    fn resolve_local(&self, token: &Token) -> Option<i8> {
-        if self.compiler.locals.contains_key(token) {
-            return Some(self.compiler.locals[token].last().unwrap().1);
-        }
-        None
-    }
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::IDENT, err);
 
@@ -318,11 +291,55 @@ impl Parser<'_> {
         self.identifier_constant(self.previous.clone())
     }
 
-    fn define_variable(&mut self, idx: usize) {
+    fn declare_variable(&mut self) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
+        if self.compiler.locals.contains_key(&self.previous)
+            && self.compiler.locals[&self.previous].last().unwrap().0 == self.compiler.scope_depth
+        {
+            panic!(
+                "Variable of name :{} already exists",
+                &self.previous.literal
+            );
+        }
+        self.add_local(self.previous.clone());
+    }
+
+    fn add_local(&mut self, token: Token) {
+        if self.compiler.locals.contains_key(&token) {
+            (*self.compiler.locals.get_mut(&token).unwrap()).push((-1, self.compiler.total));
+        } else {
+            let v = vec![(-1, self.compiler.total)];
+            self.compiler.locals.insert(token, v);
+        }
+        self.compiler.total += 1;
+    }
+
+    fn mark_initialized(&mut self, var_token: &Token) {
+        self.compiler.locals.get_mut(var_token).and_then(|v| {
+            v.last_mut()
+                .and_then(|i| Some(i.0 = self.compiler.scope_depth))
+        });
+    }
+    fn define_variable(&mut self, idx: usize, var_token: &Token) {
         if self.compiler.scope_depth > 0 {
+            self.mark_initialized(var_token);
             return;
         }
         self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
+    }
+
+    fn resolve_local(&self, token: &Token) -> Option<i8> {
+        if self.compiler.locals.contains_key(token) {
+            let (depth, index) = self.compiler.locals[token].last().unwrap();
+            if *depth == -1 {
+                panic!("Cannot read local variable in its own initializer");
+            } else {
+                return Some(*index);
+            }
+        }
+        None
     }
 
     fn named_variable(&mut self, can_assign: bool) {
@@ -358,7 +375,7 @@ struct Local {
     depth: i8,
 }
 struct Compiler {
-    locals: HashMap<Token, Vec<(i8, i8)>>,
+    locals: HashMap<Token, Vec<(i8, i8)>>, // token -> (scope_depth, slot_idx)
     scope_depth: i8,
     total: i8,
 }
