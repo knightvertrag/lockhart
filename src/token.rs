@@ -36,19 +36,26 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
     pub literal: String,
     pub lineno: usize,
 }
 
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_ == other.type_ && self.literal == other.literal
+    }
+}
+
+impl Eq for Token {}
+
 impl std::hash::Hash for Token {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.literal.hash(state);
     }
 }
-
 
 impl Token {
     pub fn new(type_: TokenType, literal: String, lineno: usize) -> Token {
