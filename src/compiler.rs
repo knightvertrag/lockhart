@@ -1,11 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    fmt::Error,
-    mem::transmute,
-    rc::Rc,
-    thread::panicking,
-};
+use std::{collections::HashMap, mem::transmute};
 
 use crate::{
     bytecode::Opcode,
@@ -37,6 +30,9 @@ trait Parsable {
 
     fn variable(&mut self, _: bool);
 
+    fn and(&mut self, _: bool);
+
+    fn or(&mut self, _: bool);
     // fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
@@ -82,6 +78,24 @@ impl Parsable for Parser<'_> {
             TokenType::NEQ => self.emit_opcodes(Opcode::OP_EQ, Opcode::OP_NOT),
             _ => unreachable!(),
         }
+    }
+
+    fn and(&mut self, _: bool) {
+        let jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        self.emit_opcode(Opcode::OP_POP);
+        self.parse_precedence(Precedence::PrecAnd);
+        self.patch_jump(jump);
+    }
+
+    fn or(&mut self, _: bool) {
+        let else_jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        let end_jump = self.emit_jump(Opcode::OP_JUMP(0));
+
+        self.patch_jump(else_jump);
+        self.emit_opcode(Opcode::OP_POP);
+
+        self.parse_precedence(Precedence::PrecOr);
+        self.patch_jump(end_jump);
     }
 
     fn grouping(&mut self, _: bool) {
@@ -147,6 +161,22 @@ impl Parser<'_> {
         self.emit_opcode(op2);
     }
 
+    fn emit_jump(&mut self, op: Opcode) -> usize {
+        self.emit_opcode(op);
+        self.chunk.code.len() - 1
+    }
+
+    fn patch_jump(&mut self, offset: usize) {
+        let jump = self.chunk.code.len() - offset - 1;
+        // 0  1  *2  3  4  5  *6
+        // i1 i2 i3 i4 i5 i6  i7
+        // println!("{:?}", self.chunk.code[offset].0);
+        if let Opcode::OP_JUMP_IF_FALSE(ref mut x) = self.chunk.code[offset].0 {
+            *x = jump;
+        } else if let Opcode::OP_JUMP(ref mut x) = self.chunk.code[offset].0 {
+            *x = jump;
+        }
+    }
     fn consume(&mut self, type_: TokenType, err: &str) {
         if self.current.type_ == type_ {
             self.advance();
@@ -169,6 +199,7 @@ impl Parser<'_> {
         } else {
             panic!("error unexpected token");
         }
+
         while precedence <= ParseRule::get_rule(self.current.clone().type_).precedence {
             self.advance();
             if let Some(infix_rule) = ParseRule::get_rule(self.previous.clone().type_).infix {
@@ -203,6 +234,9 @@ impl Parser<'_> {
             self.begin_scope();
             self.block();
             self.end_scope();
+        } else if self.match_token(TokenType::IF) {
+            self.if_statement();
+        } else if self.match_token(TokenType::WHILE) {
         } else {
             self.expression_statement();
         }
@@ -212,6 +246,24 @@ impl Parser<'_> {
         self.expression();
         self.consume(TokenType::SEMICOLON, "Expected ';' after value");
         self.emit_opcode(Opcode::OP_PRINT);
+    }
+
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LPAREN, "Expected '(' before expression");
+        self.expression();
+        self.consume(TokenType::RPAREN, "Expected ')' after expression");
+        let then_jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        self.emit_opcode(Opcode::OP_POP);
+        self.statement();
+        let else_jump = self.emit_jump(Opcode::OP_JUMP(0));
+        self.patch_jump(then_jump);
+        self.emit_opcode(Opcode::OP_POP);
+
+        if self.match_token(TokenType::ELSE) {
+            self.statement();
+        }
+
+        self.patch_jump(else_jump);
     }
 
     fn expression_statement(&mut self) {
@@ -322,6 +374,7 @@ impl Parser<'_> {
                 .and_then(|i| Some(i.0 = self.compiler.scope_depth))
         });
     }
+
     fn define_variable(&mut self, idx: usize, var_token: &Token) {
         if self.compiler.scope_depth > 0 {
             self.mark_initialized(var_token);

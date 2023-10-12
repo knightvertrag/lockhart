@@ -9,6 +9,8 @@ pub enum TokenType {
     FUNCTION,
     IF,
     ELSE,
+    FOR,
+    WHILE,
     PRINT,
     RETURN,
     TRUE,
@@ -26,6 +28,8 @@ pub enum TokenType {
     MINUS,
     MUL,
     DIV,
+    AND,
+    OR,
     COMMA,
     SEMICOLON,
     LBRACE,
@@ -91,6 +95,10 @@ pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "return" => TokenType::RETURN,
     "if" => TokenType::IF,
     "else" => TokenType::ELSE,
+    "and" => TokenType::AND,
+    "or" => TokenType::OR,
+    "for" => TokenType::FOR,
+    "while" => TokenType::WHILE,
     "nil" => TokenType::NIL,
 };
 
