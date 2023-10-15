@@ -30,5 +30,5 @@ pub enum Opcode {
     OP_POP,
     OP_JUMP(usize),
     OP_JUMP_IF_FALSE(usize),
-    OP_LOOP,
+    OP_LOOP(usize),
 }

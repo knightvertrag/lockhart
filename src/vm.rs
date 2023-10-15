@@ -174,7 +174,9 @@ impl Vm {
                 Opcode::OP_JUMP(jump_size) => {
                     self.ip += jump_size;
                 },
-                Opcode::OP_LOOP => todo!(),
+                Opcode::OP_LOOP(jump_size) => {
+                    self.ip -= jump_size;
+                },
             }
             self.ip += 1;
         }

@@ -165,7 +165,11 @@ impl Parser<'_> {
         self.emit_opcode(op);
         self.chunk.code.len() - 1
     }
-
+    
+    fn emit_loop(&mut self, loop_start: usize) {
+        let jump = self.chunk.code.len() - loop_start + 1;
+        self.emit_opcode(Opcode::OP_LOOP(jump));
+    }
     fn patch_jump(&mut self, offset: usize) {
         let jump = self.chunk.code.len() - offset - 1;
         // 0  1  *2  3  4  5  *6
@@ -237,6 +241,7 @@ impl Parser<'_> {
         } else if self.match_token(TokenType::IF) {
             self.if_statement();
         } else if self.match_token(TokenType::WHILE) {
+            self.while_statement();
         } else {
             self.expression_statement();
         }
@@ -264,6 +269,19 @@ impl Parser<'_> {
         }
 
         self.patch_jump(else_jump);
+    }
+
+    fn while_statement(&mut self) {
+        let loop_start = self.chunk.code.len();
+        self.consume(TokenType::LPAREN, "Expected '(' after while");
+        self.expression();
+        self.consume(TokenType::RPAREN, "Expected ')' after condition");
+        let jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        self.emit_opcode(Opcode::OP_POP);
+        self.statement();
+        self.emit_loop(loop_start);
+        self.patch_jump(jump);
+        self.emit_opcode(Opcode::OP_POP);
     }
 
     fn expression_statement(&mut self) {
