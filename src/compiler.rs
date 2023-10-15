@@ -1,17 +1,10 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    fmt::Error,
-    mem::transmute,
-    rc::Rc,
-    thread::panicking,
-};
+use std::{collections::HashMap, mem::transmute};
 
 use crate::{
     bytecode::Opcode,
     chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
     lexer::{self, Lexer},
-    token::{Token, TokenType, self},
+    token::{self, Token, TokenType},
     value::Value,
 };
 
@@ -37,6 +30,9 @@ trait Parsable {
 
     fn variable(&mut self, _: bool);
 
+    fn and(&mut self, _: bool);
+
+    fn or(&mut self, _: bool);
     // fn apply_parse_fn(&mut self, parse_fn: ParseFn);
 }
 pub struct Parser<'a> {
@@ -82,6 +78,24 @@ impl Parsable for Parser<'_> {
             TokenType::NEQ => self.emit_opcodes(Opcode::OP_EQ, Opcode::OP_NOT),
             _ => unreachable!(),
         }
+    }
+
+    fn and(&mut self, _: bool) {
+        let jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        self.emit_opcode(Opcode::OP_POP);
+        self.parse_precedence(Precedence::PrecAnd);
+        self.patch_jump(jump);
+    }
+
+    fn or(&mut self, _: bool) {
+        let else_jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        let end_jump = self.emit_jump(Opcode::OP_JUMP(0));
+
+        self.patch_jump(else_jump);
+        self.emit_opcode(Opcode::OP_POP);
+
+        self.parse_precedence(Precedence::PrecOr);
+        self.patch_jump(end_jump);
     }
 
     fn grouping(&mut self, _: bool) {
@@ -147,6 +161,26 @@ impl Parser<'_> {
         self.emit_opcode(op2);
     }
 
+    fn emit_jump(&mut self, op: Opcode) -> usize {
+        self.emit_opcode(op);
+        self.chunk.code.len() - 1
+    }
+    
+    fn emit_loop(&mut self, loop_start: usize) {
+        let jump = self.chunk.code.len() - loop_start + 1;
+        self.emit_opcode(Opcode::OP_LOOP(jump));
+    }
+    fn patch_jump(&mut self, offset: usize) {
+        let jump = self.chunk.code.len() - offset - 1;
+        // 0  1  *2  3  4  5  *6
+        // i1 i2 i3 i4 i5 i6  i7
+        // println!("{:?}", self.chunk.code[offset].0);
+        if let Opcode::OP_JUMP_IF_FALSE(ref mut x) = self.chunk.code[offset].0 {
+            *x = jump;
+        } else if let Opcode::OP_JUMP(ref mut x) = self.chunk.code[offset].0 {
+            *x = jump;
+        }
+    }
     fn consume(&mut self, type_: TokenType, err: &str) {
         if self.current.type_ == type_ {
             self.advance();
@@ -169,6 +203,7 @@ impl Parser<'_> {
         } else {
             panic!("error unexpected token");
         }
+
         while precedence <= ParseRule::get_rule(self.current.clone().type_).precedence {
             self.advance();
             if let Some(infix_rule) = ParseRule::get_rule(self.previous.clone().type_).infix {
@@ -203,6 +238,10 @@ impl Parser<'_> {
             self.begin_scope();
             self.block();
             self.end_scope();
+        } else if self.match_token(TokenType::IF) {
+            self.if_statement();
+        } else if self.match_token(TokenType::WHILE) {
+            self.while_statement();
         } else {
             self.expression_statement();
         }
@@ -212,6 +251,37 @@ impl Parser<'_> {
         self.expression();
         self.consume(TokenType::SEMICOLON, "Expected ';' after value");
         self.emit_opcode(Opcode::OP_PRINT);
+    }
+
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LPAREN, "Expected '(' before expression");
+        self.expression();
+        self.consume(TokenType::RPAREN, "Expected ')' after expression");
+        let then_jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        self.emit_opcode(Opcode::OP_POP);
+        self.statement();
+        let else_jump = self.emit_jump(Opcode::OP_JUMP(0));
+        self.patch_jump(then_jump);
+        self.emit_opcode(Opcode::OP_POP);
+
+        if self.match_token(TokenType::ELSE) {
+            self.statement();
+        }
+
+        self.patch_jump(else_jump);
+    }
+
+    fn while_statement(&mut self) {
+        let loop_start = self.chunk.code.len();
+        self.consume(TokenType::LPAREN, "Expected '(' after while");
+        self.expression();
+        self.consume(TokenType::RPAREN, "Expected ')' after condition");
+        let jump = self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0));
+        self.emit_opcode(Opcode::OP_POP);
+        self.statement();
+        self.emit_loop(loop_start);
+        self.patch_jump(jump);
+        self.emit_opcode(Opcode::OP_POP);
     }
 
     fn expression_statement(&mut self) {
@@ -230,6 +300,7 @@ impl Parser<'_> {
 
     fn variable_declaration(&mut self) {
         let global_idx = self.parse_variable("Expected variable name");
+        let var_token = self.previous.clone();
         if self.match_token(TokenType::ASSIGN) {
             self.expression();
         } else {
@@ -239,7 +310,7 @@ impl Parser<'_> {
             TokenType::SEMICOLON,
             "Expected ';' after variable declaration",
         );
-        self.define_variable(global_idx);
+        self.define_variable(global_idx, &var_token);
     }
 
     fn expression(&mut self) {
@@ -261,9 +332,7 @@ impl Parser<'_> {
                 }
             }
         }
-        self.compiler
-            .locals
-            .retain(|_, v| v.len() > 0);
+        self.compiler.locals.retain(|_, v| v.len() > 0);
         self.compiler.scope_depth -= 1;
         for _ in 0..popped {
             self.emit_opcode(Opcode::OP_POP);
@@ -282,32 +351,6 @@ impl Parser<'_> {
         self.chunk.add_constant(Value::STR(token.literal))
     }
 
-    fn declare_variable(&mut self) {
-        if self.compiler.scope_depth == 0 {
-            return;
-        }
-        if self.compiler.locals.contains_key(&self.previous) && self.compiler.locals[&self.previous].last().unwrap().0 == self.compiler.scope_depth {
-            panic!("Variable of name :{} already exists", &self.previous.literal);
-        }
-        self.add_local(self.previous.clone());
-    }
-
-    fn add_local(&mut self, token: Token) {
-        if self.compiler.locals.contains_key(&token) {
-            (*self.compiler.locals.get_mut(&token).unwrap()).push((self.compiler.scope_depth, self.compiler.total));
-        } else {
-            let v = vec![(self.compiler.scope_depth, self.compiler.total)];
-            self.compiler.locals.insert(token, v);
-        }
-        self.compiler.total += 1;
-    }
-
-    fn resolve_local(&self, token: &Token) -> Option<i8> {
-        if self.compiler.locals.contains_key(token) {
-            return Some(self.compiler.locals[token].last().unwrap().1);
-        }
-        None
-    }
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::IDENT, err);
 
@@ -318,11 +361,56 @@ impl Parser<'_> {
         self.identifier_constant(self.previous.clone())
     }
 
-    fn define_variable(&mut self, idx: usize) {
+    fn declare_variable(&mut self) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
+        if self.compiler.locals.contains_key(&self.previous)
+            && self.compiler.locals[&self.previous].last().unwrap().0 == self.compiler.scope_depth
+        {
+            panic!(
+                "Variable of name :{} already exists",
+                &self.previous.literal
+            );
+        }
+        self.add_local(self.previous.clone());
+    }
+
+    fn add_local(&mut self, token: Token) {
+        if self.compiler.locals.contains_key(&token) {
+            (*self.compiler.locals.get_mut(&token).unwrap()).push((-1, self.compiler.total));
+        } else {
+            let v = vec![(-1, self.compiler.total)];
+            self.compiler.locals.insert(token, v);
+        }
+        self.compiler.total += 1;
+    }
+
+    fn mark_initialized(&mut self, var_token: &Token) {
+        self.compiler.locals.get_mut(var_token).and_then(|v| {
+            v.last_mut()
+                .and_then(|i| Some(i.0 = self.compiler.scope_depth))
+        });
+    }
+
+    fn define_variable(&mut self, idx: usize, var_token: &Token) {
         if self.compiler.scope_depth > 0 {
+            self.mark_initialized(var_token);
             return;
         }
         self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
+    }
+
+    fn resolve_local(&self, token: &Token) -> Option<i8> {
+        if self.compiler.locals.contains_key(token) {
+            let (depth, index) = self.compiler.locals[token].last().unwrap();
+            if *depth == -1 {
+                panic!("Cannot read local variable in its own initializer");
+            } else {
+                return Some(*index);
+            }
+        }
+        None
     }
 
     fn named_variable(&mut self, can_assign: bool) {
@@ -358,7 +446,7 @@ struct Local {
     depth: i8,
 }
 struct Compiler {
-    locals: HashMap<Token, Vec<(i8, i8)>>,
+    locals: HashMap<Token, Vec<(i8, i8)>>, // token -> (scope_depth, slot_idx)
     scope_depth: i8,
     total: i8,
 }

@@ -31,6 +31,21 @@ impl Value {
             None
         }
     }
+
+    pub fn is_falsey(value: &Value) -> bool {
+        match value {
+            Value::NUMBER(x) => {
+                if *x == 0f64 {
+                    true
+                } else {
+                    false
+                }
+            },
+            Value::BOOL(bool) => !bool,
+            Value::STR(_) => false,
+            Value::NIL => true,
+        }
+    }
     pub fn falsify(value: &Value) -> bool {
         match value {
             Value::BOOL(x) => !*x,
@@ -59,6 +74,7 @@ impl Value {
         }
     }
 }
+
 
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -29,12 +29,12 @@ impl ParseRule {
     }
 }
 
-pub static RULES: [ParseRule; 32] = {
+pub static RULES: [ParseRule; 36] = {
     let mut a = [ParseRule {
         prefix: None,
         infix: None,
         precedence: PrecNone,
-    }; 32];
+    }; 36];
     rule!(a, IDENT, Some(|x, y| x.variable(y)), None, PrecNone);
     rule!(a, NUM, Some(|x, y| x.number(y)), None, PrecNone);
     rule!(a, STRING, Some(|x, y| x.string(y)), None, PrecNone);
@@ -43,6 +43,8 @@ pub static RULES: [ParseRule; 32] = {
     rule!(a, PRINT, None, None, PrecNone);
     rule!(a, IF, None, None, PrecNone);
     rule!(a, ELSE, None, None, PrecNone);
+    rule!(a, FOR, None, None, PrecNone);
+    rule!(a, WHILE, None, None, PrecNone);
     rule!(a, RETURN, None, None, PrecNone);
     rule!(a, TRUE, Some(|x, y| x.literal(y)), None, PrecNone);
     rule!(a, FALSE, Some(|x, y| x.literal(y)), None, PrecNone);
@@ -59,6 +61,8 @@ pub static RULES: [ParseRule; 32] = {
     rule!(a, MINUS, Some(|x, y| x.unary(y)), Some(|x, y| x.binary(y)), PrecTerm);
     rule!(a, MUL, None, Some(|x, y| x.binary(y)), PrecFactor);
     rule!(a, DIV, None, Some(|x, y| x.binary(y)), PrecFactor);
+    rule!(a, AND, None, Some(|x, y| x.and(y)), PrecAnd);
+    rule!(a, OR, None, Some(|x, y| x.or(y)), PrecOr);
     rule!(a, COMMA, None, None, PrecNone);
     rule!(a, SEMICOLON, None, None, PrecNone);
     rule!(a, LBRACE, Some(|x, y| x.grouping(y)), None, PrecNone);

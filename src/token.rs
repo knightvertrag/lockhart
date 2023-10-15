@@ -9,6 +9,8 @@ pub enum TokenType {
     FUNCTION,
     IF,
     ELSE,
+    FOR,
+    WHILE,
     PRINT,
     RETURN,
     TRUE,
@@ -26,6 +28,8 @@ pub enum TokenType {
     MINUS,
     MUL,
     DIV,
+    AND,
+    OR,
     COMMA,
     SEMICOLON,
     LBRACE,
@@ -36,19 +40,26 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
     pub literal: String,
     pub lineno: usize,
 }
 
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_ == other.type_ && self.literal == other.literal
+    }
+}
+
+impl Eq for Token {}
+
 impl std::hash::Hash for Token {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.literal.hash(state);
     }
 }
-
 
 impl Token {
     pub fn new(type_: TokenType, literal: String, lineno: usize) -> Token {
@@ -84,6 +95,10 @@ pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "return" => TokenType::RETURN,
     "if" => TokenType::IF,
     "else" => TokenType::ELSE,
+    "and" => TokenType::AND,
+    "or" => TokenType::OR,
+    "for" => TokenType::FOR,
+    "while" => TokenType::WHILE,
     "nil" => TokenType::NIL,
 };
 

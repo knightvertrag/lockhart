@@ -28,4 +28,7 @@ pub enum Opcode {
     OP_SET_LOCAL(usize),
     OP_PRINT,
     OP_POP,
+    OP_JUMP(usize),
+    OP_JUMP_IF_FALSE(usize),
+    OP_LOOP(usize),
 }

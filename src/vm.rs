@@ -162,9 +162,20 @@ impl Vm {
                 }
                 Opcode::OP_GET_LOCAL(slot_index) => {
                     self.stack.push(self.stack[slot_index].clone());
-                },
+                }
                 Opcode::OP_SET_LOCAL(slot_index) => {
                     self.stack[slot_index] = self.peek(0).clone();
+                }
+                Opcode::OP_JUMP_IF_FALSE(jump_size) => {
+                    if Value::is_falsey(self.peek(0)) {
+                        self.ip += jump_size;
+                    }
+                },
+                Opcode::OP_JUMP(jump_size) => {
+                    self.ip += jump_size;
+                },
+                Opcode::OP_LOOP(jump_size) => {
+                    self.ip -= jump_size;
                 },
             }
             self.ip += 1;
