@@ -165,11 +165,12 @@ impl Parser<'_> {
         self.emit_opcode(op);
         self.chunk.code.len() - 1
     }
-    
+
     fn emit_loop(&mut self, loop_start: usize) {
         let jump = self.chunk.code.len() - loop_start + 1;
         self.emit_opcode(Opcode::OP_LOOP(jump));
     }
+
     fn patch_jump(&mut self, offset: usize) {
         let jump = self.chunk.code.len() - offset - 1;
         // 0  1  *2  3  4  5  *6
@@ -181,6 +182,7 @@ impl Parser<'_> {
             *x = jump;
         }
     }
+
     fn consume(&mut self, type_: TokenType, err: &str) {
         if self.current.type_ == type_ {
             self.advance();
@@ -242,6 +244,8 @@ impl Parser<'_> {
             self.if_statement();
         } else if self.match_token(TokenType::WHILE) {
             self.while_statement();
+        } else if self.match_token(TokenType::FOR) {
+            self.for_statement();
         } else {
             self.expression_statement();
         }
@@ -282,6 +286,50 @@ impl Parser<'_> {
         self.emit_loop(loop_start);
         self.patch_jump(jump);
         self.emit_opcode(Opcode::OP_POP);
+    }
+
+    fn for_statement(&mut self) {
+        self.begin_scope();
+        self.consume(TokenType::LPAREN, "Expected '(' after for");
+        // initializer clause
+        if self.match_token(TokenType::SEMICOLON) {
+            // no initializer
+        } else if self.match_token(TokenType::LET) {
+            self.variable_declaration();
+        } else {
+            self.expression_statement();
+        }
+
+        // condition clause
+        let mut loop_start = self.chunk.code.len();
+        let mut exit_jump = None;
+        if !self.match_token(TokenType::SEMICOLON) {
+            self.expression();
+            self.consume(TokenType::SEMICOLON, "Expected ';' after loop condition");
+            exit_jump = Some(self.emit_jump(Opcode::OP_JUMP_IF_FALSE(0)));
+            self.emit_opcode(Opcode::OP_POP);
+        }
+
+        // incrememt clause
+        if !self.match_token(TokenType::RPAREN) {
+            let body_jump = self.emit_jump(Opcode::OP_JUMP(0));
+            let increment_start = self.chunk.code.len();
+            self.expression();
+            self.emit_opcode(Opcode::OP_POP);
+            self.consume(TokenType::RPAREN, "Expected ')' after for clause");
+
+            self.emit_loop(loop_start);
+            loop_start = increment_start;
+            self.patch_jump(body_jump);
+        }
+        self.statement();
+        self.emit_loop(loop_start);
+
+        if let Some(x) = exit_jump {
+            self.patch_jump(x);
+            self.emit_opcode(Opcode::OP_POP);
+        }
+        self.end_scope();
     }
 
     fn expression_statement(&mut self) {
