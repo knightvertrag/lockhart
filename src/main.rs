@@ -9,6 +9,8 @@ mod value;
 mod vm;
 mod object;
 mod source;
+mod gc;
+mod table;
 use bytecode::Opcode;
 use chunk::{Chunk, Lineno};
 use source::{open_source_file, execute};
