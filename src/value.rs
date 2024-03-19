@@ -1,10 +1,12 @@
 use std::fmt::Display;
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::{gc::GcRef, object::ObjString};
+
+#[derive(Clone, PartialEq)]
 pub enum Value {
     NUMBER(f64),
     BOOL(bool),
-    STR(String),
+    STR(GcRef<ObjString>),
     NIL,
 }
 
@@ -34,13 +36,7 @@ impl Value {
 
     pub fn is_falsey(value: &Value) -> bool {
         match value {
-            Value::NUMBER(x) => {
-                if *x == 0f64 {
-                    true
-                } else {
-                    false
-                }
-            },
+            Value::NUMBER(x) => *x == 0f64,
             Value::BOOL(bool) => !bool,
             Value::STR(_) => false,
             Value::NIL => true,
@@ -49,13 +45,7 @@ impl Value {
     pub fn falsify(value: &Value) -> bool {
         match value {
             Value::BOOL(x) => !*x,
-            Value::NUMBER(x) => {
-                if *x == 0f64 {
-                    true
-                } else {
-                    false
-                }
-            }
+            Value::NUMBER(x) => *x == 0f64,
             _ => false,
         }
     }
@@ -75,12 +65,11 @@ impl Value {
     }
 }
 
-
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::NUMBER(x) => write!(f, "{}", x),
-            Value::BOOL(x) =>write!(f, "{}", x),
+            Value::BOOL(x) => write!(f, "{}", x),
             Value::STR(s) => write!(f, "{}", s),
             Value::NIL => write!(f, "nil"),
         }

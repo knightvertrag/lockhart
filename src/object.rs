@@ -9,7 +9,7 @@ pub enum ObjectType {
 #[repr(C)]
 pub struct ObjString {
     header: GcObject,
-    s: String,
+    pub s: String,
     pub hash: usize,
 }
 
@@ -21,5 +21,11 @@ impl ObjString {
             hash *= hash.wrapping_mul(16777619);
         }
         hash
+    }
+}
+
+impl core::fmt::Display for ObjString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.s)
     }
 }

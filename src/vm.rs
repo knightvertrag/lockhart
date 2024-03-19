@@ -73,7 +73,7 @@ impl Vm {
                         n = -n;
                         self.stack.pop();
                         self.stack.push(Value::NUMBER(n));
-                        println!("{:?}", self.peek(0));
+                        // println!("{:?}", self.peek(0));
                     } else {
                         return Err(InterpretError::InterpretRuntimeError(
                             "Failed to negate non-number value",
@@ -83,7 +83,8 @@ impl Vm {
                 Opcode::OP_ADD => {
                     let (x, y) = (self.peek(0), self.peek(1));
                     if let (Value::STR(s1), Value::STR(s2)) = (x, y) {
-                        let concatenated = s2.to_owned() + s1;
+                        
+                        let concatenated = s2.s + &s1.s;
                         self.stack.pop();
                         self.stack.pop();
                         self.stack.push(Value::STR(concatenated));

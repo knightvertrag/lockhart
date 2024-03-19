@@ -1,6 +1,5 @@
 use std::{
-    ops::{Deref, DerefMut},
-    ptr::NonNull,
+    fmt::{Display, Write}, ops::{Deref, DerefMut}, ptr::NonNull
 };
 
 use crate::object::ObjectType;
@@ -47,3 +46,9 @@ impl<T> PartialEq for GcRef<T> {
 }
 
 impl<T> Eq for GcRef<T> {}
+
+impl<T> Display for GcRef<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", *self))
+    }
+}
