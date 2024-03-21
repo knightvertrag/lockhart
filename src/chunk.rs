@@ -3,7 +3,7 @@ use crate::{bytecode::Opcode, value::Value};
 pub mod disassemble;
 #[derive(Debug, Clone, Copy)]
 pub struct Lineno(pub usize);
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Chunk {
     pub code: Vec<(Opcode, Lineno)>,
     pub constants: Vec<Value>,
