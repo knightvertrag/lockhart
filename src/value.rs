@@ -70,7 +70,7 @@ impl Display for Value {
         match self {
             Value::NUMBER(x) => write!(f, "{}", x),
             Value::BOOL(x) => write!(f, "{}", x),
-            Value::STR(s) => write!(f, "{}", s),
+            Value::STR(s) => write!(f, "{}", **s),
             Value::NIL => write!(f, "nil"),
         }
     }

@@ -31,7 +31,7 @@ impl Table {
             if self.count == 0 {
                 return None;
             }
-            let mut index = hash % (self.capacity - 1);
+            let mut index = hash & (self.capacity - 1);
             loop {
                 let entry = self.entries.offset(index as isize);
                 match (*entry).key {
@@ -46,14 +46,14 @@ impl Table {
                         }
                     }
                 }
-                index = (index + 1) % (self.capacity - 1);
+                index = (index + 1) & (self.capacity - 1);
             }
         }
     }
 
     pub fn find_entry(entries: *mut Entry, key: GcRef<ObjString>, capacity: usize) -> *mut Entry {
         unsafe {
-            let mut index = key.hash % (capacity - 1);
+            let mut index = key.hash & (capacity - 1);
             let mut tombstone: *mut Entry = null_mut();
             loop {
                 let entry = entries.add(index);
@@ -75,7 +75,7 @@ impl Table {
                         }
                     }
                 }
-                index = (index + 1) % (capacity - 1);
+                index = (index + 1) & (capacity - 1);
             }
         }
     }
@@ -105,6 +105,14 @@ impl Table {
     // set and return true if new key
     pub fn set(&mut self, key: GcRef<ObjString>, value: Value) -> bool {
         unsafe {
+            if self.count + 1 > (self.capacity as f32 * Table::MAX_LOAD) as usize {
+                let capacity = if self.capacity < 8 {
+                    8
+                } else {
+                    self.capacity * 2
+                };
+                self.adjust_capacity(capacity);
+            }
             let entry = Table::find_entry(self.entries, key, self.capacity);
             let is_new_key = (*entry).key.is_none();
             if is_new_key {
@@ -154,7 +162,7 @@ impl Table {
         // insert all entries back into reallocated table
         // reset count because tombstones eliminated during reallocation
         self.count = 0;
-        for i in 0..capacity {
+        for i in 0..self.capacity {
             let entry = self.entries.add(i);
             if let Some(k) = (*entry).key {
                 let dest = Table::find_entry(entries, k, self.capacity);

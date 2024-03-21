@@ -27,7 +27,7 @@ impl ObjString {
         let mut hash: usize = 2166136261;
         for c in s.as_bytes() {
             hash ^= *c as usize;
-            hash *= hash.wrapping_mul(16777619);
+            hash = hash.wrapping_mul(16777619);
         }
         hash
     }
