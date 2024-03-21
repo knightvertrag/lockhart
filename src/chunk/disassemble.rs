@@ -37,5 +37,5 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) {
 fn constant_instruction(name: &str, chunk: &Chunk, idx: usize, offset: usize) {
     let constant = &chunk.constants[idx];
     println!("{name} {idx}");
-    println!("{:?}", constant);
+    println!("{}", constant);
 }

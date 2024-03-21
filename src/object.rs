@@ -14,9 +14,18 @@ pub struct ObjString {
 }
 
 impl ObjString {
-    fn compute_hash(&self) -> usize {
+    pub fn from_string(s: String) -> ObjString {
+        let hash = ObjString::compute_hash(&s);
+        ObjString {
+            header: GcObject::new(ObjectType::STRING),
+            s,
+            hash,
+        }
+
+    }
+    fn compute_hash(s: &str) -> usize {
         let mut hash: usize = 2166136261;
-        for c in self.s.as_bytes() {
+        for c in s.as_bytes() {
             hash ^= *c as usize;
             hash *= hash.wrapping_mul(16777619);
         }

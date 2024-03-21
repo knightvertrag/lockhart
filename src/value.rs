@@ -26,9 +26,9 @@ impl Value {
             None
         }
     }
-    pub fn get_string(&self) -> Option<&str> {
+    pub fn get_string(&self) -> Option<GcRef<ObjString>> {
         if let Value::STR(s) = self {
-            Some(s)
+            Some(*s)
         } else {
             None
         }
@@ -56,7 +56,7 @@ impl Value {
                 Value::BOOL(x) => *x == v2.get_bool().unwrap(),
                 Value::NUMBER(x) => *x == v2.get_number().unwrap(),
                 Value::NIL => true,
-                Value::STR(s) => s == v2.get_string().unwrap(),
+                Value::STR(s) => *s == v2.get_string().unwrap(),
                 _ => false,
             }
         } else {

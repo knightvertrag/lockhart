@@ -102,7 +102,8 @@ impl Table {
         }
     }
 
-    pub unsafe fn set(&mut self, key: GcRef<ObjString>, value: Value) -> bool {
+    // set and return true if new key
+    pub fn set(&mut self, key: GcRef<ObjString>, value: Value) -> bool {
         unsafe {
             let entry = Table::find_entry(self.entries, key, self.capacity);
             let is_new_key = (*entry).key.is_none();
@@ -116,6 +117,20 @@ impl Table {
         }
     }
 
+    pub fn get(&self, key: GcRef<ObjString>) -> Option<Value> {
+        if self.count == 0 {
+            return None;
+        }
+
+        let entry = Table::find_entry(self.entries, key, self.capacity);
+        unsafe {
+            if (*entry).key.is_none() {
+                return None;
+            } else {
+                return Some((*entry).value.clone());
+            }
+        }
+    }
     pub fn add_all(&mut self, from: &Table) {
         unsafe {
             for i in 0..(from.capacity as isize) {

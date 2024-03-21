@@ -1,11 +1,7 @@
 use std::{collections::HashMap, mem::transmute};
 
 use crate::{
-    bytecode::Opcode,
-    chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
-    lexer::{self, Lexer},
-    token::{self, Token, TokenType},
-    value::Value,
+    bytecode::Opcode, chunk::{disassemble::disassemble_chunk, Chunk, Lineno}, gc::Gc, lexer::{self, Lexer}, token::{self, Token, TokenType}, value::Value
 };
 
 use self::{parse_rule::RULES, precedence::Precedence};
@@ -40,6 +36,7 @@ pub struct Parser<'a> {
     current: Token,
     lexer: Lexer,
     chunk: &'a mut Chunk,
+    gc: &'a mut Gc,
     compiler: Compiler,
 }
 
@@ -125,7 +122,8 @@ impl Parsable for Parser<'_> {
 
     fn string(&mut self, _: bool) {
         let lexeme = self.previous.literal.clone();
-        self.emit_constant(Value::STR(lexeme));
+        let interned_s = self.gc.intern(lexeme);
+        self.emit_constant(Value::STR(interned_s));
     }
 
     fn variable(&mut self, can_assign: bool) {
@@ -133,8 +131,8 @@ impl Parsable for Parser<'_> {
     }
 }
 
-impl Parser<'_> {
-    pub fn new(lexer: Lexer, chunk: &mut Chunk) -> Parser {
+impl<'a> Parser<'a> {
+    pub fn new(lexer: Lexer, chunk: &'a mut Chunk, gc: &'a mut Gc) -> Parser<'a> {
         let current = Token::new_def();
         let previous = Token::new_def();
         let compiler = Compiler::new();
@@ -143,6 +141,7 @@ impl Parser<'_> {
             current,
             lexer,
             chunk,
+            gc,
             compiler,
         }
     }
@@ -396,7 +395,8 @@ impl Parser<'_> {
     }
     /* ==================== variable ========================= */
     fn identifier_constant(&mut self, token: Token) -> usize {
-        self.chunk.add_constant(Value::STR(token.literal))
+        let identifier = self.gc.intern(token.literal);
+        self.chunk.add_constant(Value::STR(identifier))
     }
 
     fn parse_variable(&mut self, err: &str) -> usize {
@@ -508,9 +508,9 @@ impl Compiler {
         }
     }
 }
-pub fn compile(source: String, chunk: &mut Chunk) -> Result<(), &'static str> {
+pub fn compile(source: String, chunk: &mut Chunk, gc: &mut Gc) -> Result<(), &'static str> {
     let lexer = Lexer::new(source);
-    let mut parser = Parser::new(lexer, chunk);
+    let mut parser = Parser::new(lexer, chunk, gc);
     parser.advance();
 
     while !parser.match_token(TokenType::EOF) {
