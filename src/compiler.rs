@@ -1,7 +1,13 @@
 use std::{collections::HashMap, mem::transmute};
 
 use crate::{
-    bytecode::Opcode, chunk::{disassemble::disassemble_chunk, Chunk, Lineno}, gc::Gc, lexer::{self, Lexer}, token::{self, Token, TokenType}, value::Value
+    bytecode::Opcode,
+    chunk::{disassemble::disassemble_chunk, Chunk, Lineno},
+    gc::{Gc, GcRef},
+    lexer::Lexer,
+    object::{ObjFunction, ObjString},
+    token::{Token, TokenType},
+    value::Value,
 };
 
 use self::{parse_rule::RULES, precedence::Precedence};
@@ -35,9 +41,8 @@ pub struct Parser<'a> {
     previous: Token,
     current: Token,
     lexer: Lexer,
-    chunk: &'a mut Chunk,
     gc: &'a mut Gc,
-    compiler: Compiler,
+    compiler: Box<Compiler>,
 }
 
 impl Parsable for Parser<'_> {
@@ -132,15 +137,15 @@ impl Parsable for Parser<'_> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(lexer: Lexer, chunk: &'a mut Chunk, gc: &'a mut Gc) -> Parser<'a> {
+    pub fn new(lexer: Lexer, gc: &'a mut Gc) -> Parser<'a> {
         let current = Token::new_def();
         let previous = Token::new_def();
-        let compiler = Compiler::new();
+        let function_name = gc.intern("script".to_owned());
+        let compiler = Compiler::new(function_name, FunctionType::SCRIPT);
         Parser {
             previous,
             current,
             lexer,
-            chunk,
             gc,
             compiler,
         }
@@ -151,8 +156,15 @@ impl<'a> Parser<'a> {
         self.current = self.lexer.next_token();
     }
 
+    fn chunk(&mut self) -> &mut Chunk {
+        &mut self.compiler.function.chunk
+    }
+
     fn emit_opcode(&mut self, op: Opcode) {
-        self.chunk.write_chunk(op, Lineno(self.previous.lineno));
+        self.compiler
+            .function
+            .chunk
+            .write_chunk(op, Lineno(self.previous.lineno));
     }
 
     fn emit_opcodes(&mut self, op1: Opcode, op2: Opcode) {
@@ -162,22 +174,29 @@ impl<'a> Parser<'a> {
 
     fn emit_jump(&mut self, op: Opcode) -> usize {
         self.emit_opcode(op);
-        self.chunk.code.len() - 1
+        self.chunk().code.len() - 1
     }
 
     fn emit_loop(&mut self, loop_start: usize) {
-        let jump = self.chunk.code.len() - loop_start + 1;
+        let jump = self.chunk().code.len() - loop_start + 1;
         self.emit_opcode(Opcode::OP_LOOP(jump));
     }
 
+    fn emit_return(&mut self) {
+        // match self.compiler.f_type {
+        //     _ => self.emit_opcode(Opcode::OP_NIL)
+        // }
+        self.emit_opcode(Opcode::OP_RETURN);
+    }
+
     fn patch_jump(&mut self, offset: usize) {
-        let jump = self.chunk.code.len() - offset - 1;
+        let jump = self.chunk().code.len() - offset - 1;
         // 0  1  *2  3  4  5  *6
         // i1 i2 i3 i4 i5 i6  i7
-        // println!("{:?}", self.chunk.code[offset].0);
-        if let Opcode::OP_JUMP_IF_FALSE(ref mut x) = self.chunk.code[offset].0 {
+        // println!("{:?}", self.chunk().code[offset].0);
+        if let Opcode::OP_JUMP_IF_FALSE(ref mut x) = self.chunk().code[offset].0 {
             *x = jump;
-        } else if let Opcode::OP_JUMP(ref mut x) = self.chunk.code[offset].0 {
+        } else if let Opcode::OP_JUMP(ref mut x) = self.chunk().code[offset].0 {
             *x = jump;
         }
     }
@@ -191,7 +210,7 @@ impl<'a> Parser<'a> {
     }
 
     fn emit_constant(&mut self, value: Value) {
-        let idx = self.chunk.add_constant(value);
+        let idx = self.chunk().add_constant(value);
         self.emit_opcode(Opcode::OP_CONSTANT(idx));
     }
 
@@ -275,7 +294,7 @@ impl<'a> Parser<'a> {
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.chunk.code.len();
+        let loop_start = self.chunk().code.len();
         self.consume(TokenType::LPAREN, "Expected '(' after while");
         self.expression();
         self.consume(TokenType::RPAREN, "Expected ')' after condition");
@@ -300,7 +319,7 @@ impl<'a> Parser<'a> {
         }
 
         // condition clause
-        let mut loop_start = self.chunk.code.len();
+        let mut loop_start = self.chunk().code.len();
         let mut exit_jump = None;
         if !self.match_token(TokenType::SEMICOLON) {
             self.expression();
@@ -312,7 +331,7 @@ impl<'a> Parser<'a> {
         // incrememt clause
         if !self.match_token(TokenType::RPAREN) {
             let body_jump = self.emit_jump(Opcode::OP_JUMP(0));
-            let increment_start = self.chunk.code.len();
+            let increment_start = self.chunk().code.len();
             self.expression();
             self.emit_opcode(Opcode::OP_POP);
             self.consume(TokenType::RPAREN, "Expected ')' after for clause");
@@ -396,7 +415,10 @@ impl<'a> Parser<'a> {
     /* ==================== variable ========================= */
     fn identifier_constant(&mut self, token: Token) -> usize {
         let identifier = self.gc.intern(token.literal);
-        self.chunk.add_constant(Value::STR(identifier))
+        self.compiler
+            .function
+            .chunk
+            .add_constant(Value::STR(identifier))
     }
 
     fn parse_variable(&mut self, err: &str) -> usize {
@@ -483,8 +505,10 @@ impl<'a> Parser<'a> {
             self.emit_opcode(get_op);
         }
     }
-    fn end_compiler(&mut self) {
-        self.emit_opcode(Opcode::OP_RETURN);
+
+    fn end_compiler(mut self) -> GcRef<ObjFunction> {
+        self.emit_return();
+        self.gc.alloc(self.compiler.function)
     }
 }
 
@@ -494,23 +518,40 @@ struct Local {
     depth: i8,
 }
 struct Compiler {
+    function: ObjFunction,
+    f_type: FunctionType,
     locals: HashMap<Token, Vec<(i8, i8)>>, // token -> (scope_depth, slot_idx)
     scope_depth: i8,
     total: i8,
 }
 
+enum FunctionType {
+    FUNCTION,
+    SCRIPT,
+}
+
 impl Compiler {
-    fn new() -> Self {
-        Compiler {
+    fn new(function_name: GcRef<ObjString>, f_type: FunctionType) -> Box<Self> {
+        let function = ObjFunction::new(function_name);
+        let mut compiler = Compiler {
+            function,
+            f_type,
             locals: HashMap::new(),
             scope_depth: 0,
             total: 0,
-        }
+        };
+
+        // compiler.locals.insert(
+        //     Token::new(TokenType::STRING, "".to_owned(), 0),
+        //     vec![(0, 0)],
+        // );
+        Box::new(compiler)
     }
 }
-pub fn compile(source: String, chunk: &mut Chunk, gc: &mut Gc) -> Result<(), &'static str> {
+
+pub fn compile(source: String, gc: &mut Gc) -> Result<GcRef<ObjFunction>, &'static str> {
     let lexer = Lexer::new(source);
-    let mut parser = Parser::new(lexer, chunk, gc);
+    let mut parser = Parser::new(lexer, gc);
     parser.advance();
 
     while !parser.match_token(TokenType::EOF) {
@@ -518,7 +559,7 @@ pub fn compile(source: String, chunk: &mut Chunk, gc: &mut Gc) -> Result<(), &'s
     }
     // parser.expression();
     // parser.consume(TokenType::EOF, "Expected EOF");
-    parser.end_compiler();
+    let function = parser.end_compiler();
     // disassemble_chunk(chunk, "TEST");
-    Ok(())
+    Ok(function)
 }

@@ -1,17 +1,12 @@
-use std::collections::HashMap;
-
 use crate::{
-    bytecode::Opcode,
-    chunk::{disassemble::disassemble_instruction, Chunk, Lineno},
-    compiler::compile,
-    gc::Gc,
-    table::Table,
-    value::Value,
+    bytecode::Opcode, chunk::{disassemble::disassemble_instruction, Chunk, Lineno}, compiler::compile, gc::{Gc, GcRef}, object::ObjFunction, table::Table, value::Value
 };
 
 mod tests;
 pub struct Vm {
     gc: Gc,
+    frames: [CallFrame; Vm::MAX_FRAMES],
+    frame_count: usize,
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
@@ -38,13 +33,30 @@ pub enum InterpretError {
     InterpretRuntimeError(&'static str),
 }
 
+#[derive(Clone, Copy)]
+struct CallFrame {
+    function: GcRef<ObjFunction>,
+    ip: usize,
+    slot: usize
+}
+
 impl Vm {
+    const MAX_FRAMES: usize = 64;
+
     pub fn init_vm() -> Vm {
         let chunk = Chunk::new();
         let ip = 0;
-        let mut gc = Gc::new();
+        let gc = Gc::new();
         Vm {
             gc,
+            frames: [
+                CallFrame {
+                    function: GcRef::dangling(),
+                    ip: 0,
+                    slot: 0,
+                }; Vm::MAX_FRAMES
+            ],
+            frame_count: 0,
             chunk,
             ip,
             stack: Vec::<Value>::new(),
@@ -53,7 +65,7 @@ impl Vm {
     }
 
     pub fn interpret(&mut self, source: String) -> Result<(), InterpretError> {
-        compile(source, &mut self.chunk, &mut self.gc).unwrap();
+        compile(source, &mut self.gc).unwrap();
         return self.run();
     }
 
@@ -99,8 +111,7 @@ impl Vm {
                         return Err(InterpretError::InterpretRuntimeError(
                             "Failed to add non-number values",
                         ));
-                    }
-
+                    }  
                     // println!("{:?}", self.peek());
                 }
                 Opcode::OP_SUBSTRACT => {
@@ -145,7 +156,7 @@ impl Vm {
                     self.stack.pop();
                 }
                 Opcode::OP_DEFINE_GLOBAL(idx) => {
-                    let name = self.read_constant(idx).get_string().unwrap().to_owned();
+                    let name = self.read_constant(idx).get_string().unwrap();
                     let value = self.stack.pop().unwrap();
                     self.globals.set(name, value);
                 }

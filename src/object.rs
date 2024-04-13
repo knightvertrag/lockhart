@@ -1,4 +1,4 @@
-use crate::gc::GcObject;
+use crate::{chunk::Chunk, gc::{GcObject, GcRef}};
 
 pub enum ObjectType {
     STRING,
@@ -6,6 +6,30 @@ pub enum ObjectType {
     CLASS,
 }
 
+#[repr(C)]
+pub struct ObjFunction {
+    header: GcObject,
+    arity: usize,
+    pub chunk: Chunk,
+    name: GcRef<ObjString>,
+}
+
+impl ObjFunction {
+    pub fn new(name: GcRef<ObjString>) -> ObjFunction {
+        ObjFunction {
+            header: GcObject::new(ObjectType::FUNCTION),
+            arity: 0,
+            chunk: Chunk::new(),
+            name, 
+        }
+    }
+}
+
+impl core::fmt::Display for ObjFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("<fn {}>", *(*self).name))
+    }
+}
 #[repr(C)]
 pub struct ObjString {
     header: GcObject,

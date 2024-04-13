@@ -1,12 +1,13 @@
 use std::fmt::Display;
 
-use crate::{gc::GcRef, object::ObjString};
+use crate::{gc::GcRef, object::{ObjFunction, ObjString}};
 
 #[derive(Clone, PartialEq)]
 pub enum Value {
     NUMBER(f64),
     BOOL(bool),
     STR(GcRef<ObjString>),
+    FUNCTION(GcRef<ObjFunction>),
     NIL,
 }
 
@@ -26,6 +27,7 @@ impl Value {
             None
         }
     }
+    
     pub fn get_string(&self) -> Option<GcRef<ObjString>> {
         if let Value::STR(s) = self {
             Some(*s)
@@ -40,8 +42,10 @@ impl Value {
             Value::BOOL(bool) => !bool,
             Value::STR(_) => false,
             Value::NIL => true,
+            _ => true,
         }
     }
+
     pub fn falsify(value: &Value) -> bool {
         match value {
             Value::BOOL(x) => !*x,
@@ -71,6 +75,7 @@ impl Display for Value {
             Value::NUMBER(x) => write!(f, "{}", x),
             Value::BOOL(x) => write!(f, "{}", x),
             Value::STR(s) => write!(f, "{}", **s),
+            Value::FUNCTION(x) => write!(f, "{}", **x),
             Value::NIL => write!(f, "nil"),
         }
     }
