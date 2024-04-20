@@ -1,5 +1,6 @@
 use crate::{chunk::Chunk, gc::{GcObject, GcRef}};
 
+#[derive(Clone)]
 pub enum ObjectType {
     STRING,
     FUNCTION,

@@ -7,7 +7,7 @@ use crate::{
     lexer::Lexer,
     object::{ObjFunction, ObjString},
     token::{Token, TokenType},
-    value::Value,
+    value::Value, vm::InterpretError,
 };
 
 use self::{parse_rule::RULES, precedence::Precedence};
@@ -541,15 +541,16 @@ impl Compiler {
             total: 0,
         };
 
-        // compiler.locals.insert(
-        //     Token::new(TokenType::STRING, "".to_owned(), 0),
-        //     vec![(0, 0)],
-        // );
+        compiler.locals.insert(
+            Token::new(TokenType::STRING, "".to_owned(), 0),
+            vec![(0, 0)],
+        );
+
         Box::new(compiler)
     }
 }
 
-pub fn compile(source: String, gc: &mut Gc) -> Result<GcRef<ObjFunction>, &'static str> {
+pub fn compile(source: String, gc: &mut Gc) -> Result<GcRef<ObjFunction>, InterpretError> {
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer, gc);
     parser.advance();

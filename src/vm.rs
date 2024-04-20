@@ -1,3 +1,5 @@
+use std::{cell::RefCell, ptr::null};
+
 use crate::{
     bytecode::Opcode, chunk::{disassemble::disassemble_instruction, Chunk, Lineno}, compiler::compile, gc::{Gc, GcRef}, object::ObjFunction, table::Table, value::Value
 };
@@ -5,10 +7,8 @@ use crate::{
 mod tests;
 pub struct Vm {
     gc: Gc,
-    frames: [CallFrame; Vm::MAX_FRAMES],
+    frames: RefCell<[CallFrame; Vm::MAX_FRAMES]>,
     frame_count: usize,
-    chunk: Chunk,
-    ip: usize,
     stack: Vec<Value>,
     globals: Table,
 }
@@ -36,50 +36,71 @@ pub enum InterpretError {
 #[derive(Clone, Copy)]
 struct CallFrame {
     function: GcRef<ObjFunction>,
-    ip: usize,
-    slot: usize
+    ip: *const (Opcode, Lineno), // Lineno is uneccessay here, but required since chunk.code has it
+    slot: usize // starting stack-slot index of this function call
+}
+
+impl CallFrame {
+    pub fn new(function: GcRef<ObjFunction>, slot: usize) -> CallFrame {
+        CallFrame { function, ip: function.chunk.code.as_ptr(), slot }
+    }
+
+    pub fn offset(&self) -> usize {
+        unsafe {
+            let pos = self.ip.offset_from(self.function.chunk.code.as_ptr());
+            pos as usize
+        }
+    }
 }
 
 impl Vm {
     const MAX_FRAMES: usize = 64;
 
     pub fn init_vm() -> Vm {
-        let chunk = Chunk::new();
-        let ip = 0;
         let gc = Gc::new();
         Vm {
             gc,
-            frames: [
+            frames: RefCell::new([
                 CallFrame {
                     function: GcRef::dangling(),
-                    ip: 0,
+                    ip: null(),
                     slot: 0,
                 }; Vm::MAX_FRAMES
-            ],
+            ]),
             frame_count: 0,
-            chunk,
-            ip,
             stack: Vec::<Value>::new(),
             globals: Table::new(),
         }
     }
 
     pub fn interpret(&mut self, source: String) -> Result<(), InterpretError> {
-        compile(source, &mut self.gc).unwrap();
+        let function = compile(source, &mut self.gc)?;
+        self.stack.push(Value::FUNCTION(function));
+        let closure = self.alloc(function);
+        let frame = CallFrame::new(*closure, 0);
+        (*self.frames.borrow_mut())[self.frame_count] = frame;
+        self.frame_count += 1;
         return self.run();
     }
 
+    fn alloc<T>(&mut self, object: T) -> GcRef<T> {
+        self.gc.alloc(object)
+    }
+
     fn run(&mut self) -> Result<(), InterpretError> {
+
+        let frame = &mut self.frames.borrow_mut()[self.frame_count - 1];
         loop {
             // disassemble_instruction(&self.chunk, _i);
-
-            match self.chunk.code[self.ip].0 {
+            let op = unsafe {(*frame.ip).0};
+            frame.ip = unsafe {frame.ip.offset(1)};
+            match op {
                 Opcode::OP_RETURN => {
-                    self.ip += 1;
+                    unsafe {frame.ip = frame.ip.offset(1);}
                     return Ok(());
                 }
                 Opcode::OP_CONSTANT(idx) => {
-                    let constant = self.read_constant(idx);
+                    let constant = Vm::read_constant(&frame, idx);
                     // println!("{:?}", constant);
                     self.stack.push(constant);
                     // return InterpretResult::InterpretOk;
@@ -109,7 +130,7 @@ impl Vm {
                         binary_op!(NUMBER, +, self);
                     } else {
                         return Err(InterpretError::InterpretRuntimeError(
-                            "Failed to add non-number values",
+                            "Invalid addition operands",
                         ));
                     }  
                     // println!("{:?}", self.peek());
@@ -156,12 +177,12 @@ impl Vm {
                     self.stack.pop();
                 }
                 Opcode::OP_DEFINE_GLOBAL(idx) => {
-                    let name = self.read_constant(idx).get_string().unwrap();
+                    let name = Vm::read_constant(&frame, idx).get_string().unwrap();
                     let value = self.stack.pop().unwrap();
                     self.globals.set(name, value);
                 }
                 Opcode::OP_GET_GLOBAL(idx) => {
-                    let name = self.read_constant(idx).get_string().unwrap();
+                    let name = Vm::read_constant(&frame, idx).get_string().unwrap();
                     if let Some(value) = self.globals.get(name) {
                         self.stack.push(value.clone());
                     } else {
@@ -169,7 +190,7 @@ impl Vm {
                     }
                 }
                 Opcode::OP_SET_GLOBAL(idx) => {
-                    let name = self.read_constant(idx).get_string().unwrap();
+                    let name = Vm::read_constant(&frame, idx).get_string().unwrap();
                     let value = self.peek(0);
                     if self.globals.set(name, value.clone()) {
                         self.globals.delete_entry(name);
@@ -177,32 +198,33 @@ impl Vm {
                     }
                 }
                 Opcode::OP_GET_LOCAL(slot_index) => {
-                    self.stack.push(self.stack[slot_index].clone());
+                    let offset = slot_index + frame.slot;
+                    self.stack.push(self.stack[offset].clone());
                 }
                 Opcode::OP_SET_LOCAL(slot_index) => {
-                    self.stack[slot_index] = self.peek(0).clone();
+                    let offset = slot_index + frame.slot;
+                    self.stack[offset] = self.peek(0).clone();
                 }
                 Opcode::OP_JUMP_IF_FALSE(jump_size) => {
                     if Value::is_falsey(self.peek(0)) {
-                        self.ip += jump_size;
+                        frame.ip = unsafe {frame.ip.offset(jump_size as isize)};
                     }
                 }
                 Opcode::OP_JUMP(jump_size) => {
-                    self.ip += jump_size;
+                    frame.ip = unsafe {frame.ip.offset(jump_size as isize)};
                 }
                 Opcode::OP_LOOP(jump_size) => {
-                    self.ip -= jump_size;
+                    frame.ip = unsafe {frame.ip.offset(-1 - (jump_size as isize))};
                 }
             }
-            self.ip += 1;
-        }
+    }
         // println!("{:?}", self.peek(0));
     }
 
     fn peek(&self, idx: usize) -> &Value {
         &self.stack[self.stack.len() - 1 - idx]
     }
-    fn read_constant(&self, idx: usize) -> Value {
-        self.chunk.constants[idx].clone()
+    fn read_constant(frame: &CallFrame, idx: usize) -> Value {
+        frame.function.chunk.constants[idx].clone()
     }
 }
