@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem::transmute};
+use std::{collections::HashMap, mem::transmute, thread::panicking};
 
 use crate::{
     bytecode::Opcode,
@@ -7,7 +7,8 @@ use crate::{
     lexer::Lexer,
     object::{ObjFunction, ObjString},
     token::{Token, TokenType},
-    value::Value, vm::InterpretError,
+    value::Value,
+    vm::InterpretError,
 };
 
 use self::{parse_rule::RULES, precedence::Precedence};
@@ -357,16 +358,24 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self) {
-        if self.match_token(TokenType::LET) {
+        if self.match_token(TokenType::FUNCTION) {
+            self.function_declaration();
+        } else if self.match_token(TokenType::LET) {
             self.variable_declaration();
         } else {
             self.statement();
         }
     }
 
+    fn function_declaration(&mut self) {
+        let global = self.parse_variable("Expected Function name");
+        self.mark_initialized();
+        // self.function(FunctionType::FUNCTION);
+        self.define_variable(global);
+    }
+
     fn variable_declaration(&mut self) {
         let global_idx = self.parse_variable("Expected variable name");
-        let var_token = self.previous.clone();
         if self.match_token(TokenType::ASSIGN) {
             self.expression();
         } else {
@@ -376,7 +385,7 @@ impl<'a> Parser<'a> {
             TokenType::SEMICOLON,
             "Expected ';' after variable declaration",
         );
-        self.define_variable(global_idx, &var_token);
+        self.define_variable(global_idx);
     }
 
     fn expression(&mut self) {
@@ -388,20 +397,12 @@ impl<'a> Parser<'a> {
     }
 
     fn end_scope(&mut self) {
-        let mut popped = 0;
-        for (_, scopes) in &mut self.compiler.locals {
-            for i in (0..scopes.len()).rev() {
-                if scopes[i].0 == self.compiler.scope_depth {
-                    popped += 1;
-                    self.compiler.total -= 1;
-                    scopes.pop();
-                }
-            }
-        }
-        self.compiler.locals.retain(|_, v| v.len() > 0);
         self.compiler.scope_depth -= 1;
-        for _ in 0..popped {
+        while self.compiler.total > 0
+            && self.compiler.locals[self.compiler.total - 1].depth > self.compiler.scope_depth
+        {
             self.emit_opcode(Opcode::OP_POP);
+            self.compiler.total -= 1;
         }
     }
 
@@ -435,49 +436,48 @@ impl<'a> Parser<'a> {
         if self.compiler.scope_depth == 0 {
             return;
         }
-        if self.compiler.locals.contains_key(&self.previous)
-            && self.compiler.locals[&self.previous].last().unwrap().0 == self.compiler.scope_depth
-        {
-            panic!(
-                "Variable of name :{} already exists",
-                &self.previous.literal
-            );
+        let token = &self.previous;
+        for local in &self.compiler.locals {
+            if local.depth != -1 && local.depth < self.compiler.scope_depth {
+                break;
+            }
+            if local.name.literal == token.literal {
+                panic!("Error: Variable with name {} already exists", token.literal);
+            }
         }
         self.add_local(self.previous.clone());
     }
 
     fn add_local(&mut self, token: Token) {
-        if self.compiler.locals.contains_key(&token) {
-            (*self.compiler.locals.get_mut(&token).unwrap()).push((-1, self.compiler.total));
-        } else {
-            let v = vec![(-1, self.compiler.total)];
-            self.compiler.locals.insert(token, v);
+        if self.compiler.total == STACK_SIZE {
+            panic!("Stack overflow; too many local variables");
         }
+        self.compiler.locals[self.compiler.total] = Local {
+            name: token,
+            depth: -1,
+        };
         self.compiler.total += 1;
     }
 
-    fn mark_initialized(&mut self, var_token: &Token) {
-        self.compiler.locals.get_mut(var_token).and_then(|v| {
-            v.last_mut()
-                .and_then(|i| Some(i.0 = self.compiler.scope_depth))
-        });
+    fn mark_initialized(&mut self) {
+        self.compiler.locals[self.compiler.total - 1].depth = self.compiler.scope_depth;
     }
 
-    fn define_variable(&mut self, idx: usize, var_token: &Token) {
+    fn define_variable(&mut self, idx: usize) {
         if self.compiler.scope_depth > 0 {
-            self.mark_initialized(var_token);
+            self.mark_initialized();
             return;
         }
         self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
     }
 
     fn resolve_local(&self, token: &Token) -> Option<i8> {
-        if self.compiler.locals.contains_key(token) {
-            let (depth, index) = self.compiler.locals[token].last().unwrap();
-            if *depth == -1 {
-                panic!("Cannot read local variable in its own initializer");
-            } else {
-                return Some(*index);
+        for (i, local) in self.compiler.locals.iter().enumerate() {
+            if local.name.literal == token.literal {
+                if local.depth == -1 {
+                    panic!("Cannot read variable into its own initializer");
+                }
+                return Some(i as i8);
             }
         }
         None
@@ -512,17 +512,19 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Clone)]
 struct Local {
     name: Token,
     depth: i8,
 }
+
+const STACK_SIZE: usize = 50000;
 struct Compiler {
     function: ObjFunction,
     f_type: FunctionType,
-    locals: HashMap<Token, Vec<(i8, i8)>>, // token -> (scope_depth, slot_idx)
+    locals: Vec<Local>,
     scope_depth: i8,
-    total: i8,
+    total: usize,
 }
 
 enum FunctionType {
@@ -531,20 +533,19 @@ enum FunctionType {
 }
 
 impl Compiler {
-    fn new(function_name: GcRef<ObjString>, f_type: FunctionType) -> Box<Self> {
+    fn new(function_name: GcRef<ObjString>, f_type: FunctionType) -> Box<Compiler> {
         let function = ObjFunction::new(function_name);
-        let mut compiler = Compiler {
+        let array_repeat_value: Local = Local {
+            name: Token::new_def(),
+            depth: -1,
+        };
+        let compiler = Compiler {
             function,
             f_type,
-            locals: HashMap::new(),
+            locals: vec![array_repeat_value; STACK_SIZE],
             scope_depth: 0,
             total: 0,
         };
-
-        compiler.locals.insert(
-            Token::new(TokenType::STRING, "".to_owned(), 0),
-            vec![(0, 0)],
-        );
 
         Box::new(compiler)
     }

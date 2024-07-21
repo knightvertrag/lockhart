@@ -36,7 +36,7 @@ pub enum InterpretError {
 #[derive(Clone, Copy)]
 struct CallFrame {
     function: GcRef<ObjFunction>,
-    ip: *const (Opcode, Lineno), // Lineno is uneccessay here, but required since chunk.code has it
+    ip: *const (Opcode, Lineno), // pointer to instruction vector
     slot: usize // starting stack-slot index of this function call
 }
 
