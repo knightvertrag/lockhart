@@ -67,7 +67,7 @@ pub static RULES: [ParseRule; 36] = {
     rule!(a, SEMICOLON, None, None, PrecNone);
     rule!(a, LBRACE, Some(|x, y| x.grouping(y)), None, PrecNone);
     rule!(a, RBRACE, Some(|x, y| x.grouping(y)), None, PrecNone);
-    rule!(a, LPAREN, Some(|x, y| x.grouping(y)), None, PrecNone);
+    rule!(a, LPAREN, Some(|x, y| x.grouping(y)), Some(|x, y| x.call(y)), PrecCall);
     rule!(a, RPAREN, Some(|x, y| x.grouping(y)), None, PrecNone);
     rule!(a, ILLEGAL, None, None, PrecNone);
     rule!(a, EOF, None, None, PrecNone);

@@ -10,7 +10,7 @@ pub enum ObjectType {
 #[repr(C)]
 pub struct ObjFunction {
     header: GcObject,
-    arity: usize,
+    pub arity: u8,
     pub chunk: Chunk,
     name: GcRef<ObjString>,
 }
@@ -28,7 +28,11 @@ impl ObjFunction {
 
 impl core::fmt::Display for ObjFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("<fn {}>", *(*self).name))
+        if self.name.s == "" {
+            f.write_fmt(format_args!("<fn {}>", *(*self).name))
+        } else {
+            f.write_fmt(format_args!("<script>"))
+        }
     }
 }
 #[repr(C)]

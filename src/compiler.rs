@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem::transmute, thread::panicking};
+use std::mem::{self, transmute};
 
 use crate::{
     bytecode::Opcode,
@@ -36,7 +36,9 @@ trait Parsable {
     fn and(&mut self, _: bool);
 
     fn or(&mut self, _: bool);
-    // fn apply_parse_fn(&mut self, parse_fn: ParseFn);
+
+    fn call(&mut self, _: bool);
+    // fn apply_parse_fn(&mut self, parse_fn: Parse Fn);
 }
 pub struct Parser<'a> {
     previous: Token,
@@ -58,8 +60,8 @@ impl Parsable for Parser<'_> {
     }
 
     fn binary(&mut self, _: bool) {
-        let operator_type = self.previous.type_.clone();
-        let rule = parse_rule::ParseRule::get_rule(operator_type.clone());
+        let operator_type = self.previous.type_;
+        let rule = parse_rule::ParseRule::get_rule(operator_type);
         if (rule.precedence as usize) < 11
         /*variant count for Precedence; !todo - replace with variant_count::<Precedence>() once stabilized*/
         {
@@ -135,6 +137,11 @@ impl Parsable for Parser<'_> {
     fn variable(&mut self, can_assign: bool) {
         self.named_variable(can_assign);
     }
+
+    fn call(&mut self, _: bool) {
+        let count = self.arg_count();
+        self.emit_opcode(Opcode::OP_CALL(count));
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -187,6 +194,7 @@ impl<'a> Parser<'a> {
         // match self.compiler.f_type {
         //     _ => self.emit_opcode(Opcode::OP_NIL)
         // }
+        self.emit_opcode(Opcode::OP_NIL);
         self.emit_opcode(Opcode::OP_RETURN);
     }
 
@@ -206,7 +214,7 @@ impl<'a> Parser<'a> {
         if self.current.type_ == type_ {
             self.advance();
         } else {
-            panic!("{}", err); // panic if current token in not the expected token
+            panic!("{}", err);
         }
     }
 
@@ -370,7 +378,7 @@ impl<'a> Parser<'a> {
     fn function_declaration(&mut self) {
         let global = self.parse_variable("Expected Function name");
         self.mark_initialized();
-        // self.function(FunctionType::FUNCTION);
+        self.function(FunctionType::FUNCTION);
         self.define_variable(global);
     }
 
@@ -436,13 +444,16 @@ impl<'a> Parser<'a> {
         if self.compiler.scope_depth == 0 {
             return;
         }
-        let token = &self.previous;
+        let var_token = &self.previous;
         for local in &self.compiler.locals {
             if local.depth != -1 && local.depth < self.compiler.scope_depth {
                 break;
             }
-            if local.name.literal == token.literal {
-                panic!("Error: Variable with name {} already exists", token.literal);
+            if local.name.literal == var_token.literal {
+                panic!(
+                    "Error: Variable with name {} already exists",
+                    var_token.literal
+                );
             }
         }
         self.add_local(self.previous.clone());
@@ -460,6 +471,9 @@ impl<'a> Parser<'a> {
     }
 
     fn mark_initialized(&mut self) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
         self.compiler.locals[self.compiler.total - 1].depth = self.compiler.scope_depth;
     }
 
@@ -471,6 +485,23 @@ impl<'a> Parser<'a> {
         self.emit_opcode(Opcode::OP_DEFINE_GLOBAL(idx));
     }
 
+    fn arg_count(&mut self) -> u8 {
+        let mut count: u8 = 0;
+        if !self.check_token_type(TokenType::RPAREN) {
+            loop {
+                self.expression();
+                if count == u8::MAX {
+                    panic!("Cannot have more than {} arguments", count);
+                }
+                count += 1;
+                if !self.match_token(TokenType::COMMA) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RPAREN, "Expected ')' after arguments.");
+        count
+    }
     fn resolve_local(&self, token: &Token) -> Option<i8> {
         for (i, local) in self.compiler.locals.iter().enumerate() {
             if local.name.literal == token.literal {
@@ -506,9 +537,46 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn end_compiler(mut self) -> GcRef<ObjFunction> {
+    fn function(&mut self, f_type: FunctionType) {
+        self.push_compiler(f_type);
+        self.begin_scope();
+        self.consume(TokenType::LPAREN, "Expected '(' after function name");
+        if !self.check_token_type(TokenType::RPAREN) {
+            loop {
+                self.compiler.function.arity += 1;
+                if self.compiler.function.arity > u8::MAX {
+                    panic!("Cannot have more than {} parameters", u8::MAX);
+                }
+                let constant = self.parse_variable("Expected parameter name");
+                self.define_variable(constant);
+                if !self.match_token(TokenType::COMMA) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RPAREN, "Expected ')' after parameters");
+        self.consume(TokenType::LBRACE, "Expected '{' before function body");
+        self.block();
+        let function = self.end_compiler();
+        let function = self.gc.alloc(function);
+        self.emit_constant(Value::FUNCTION(function));
+    }
+
+    fn push_compiler(&mut self, f_type: FunctionType) {
+        let f_name = self.gc.intern(self.previous.literal.clone());
+        let compiler = Compiler::new(f_name, f_type);
+        let old_compiler = mem::replace(&mut self.compiler, compiler);
+        self.compiler.enclosing = Some(old_compiler);
+    }
+
+    fn end_compiler(&mut self) -> ObjFunction {
         self.emit_return();
-        self.gc.alloc(self.compiler.function)
+        if let Some(enclosing) = self.compiler.enclosing.take() {
+            let compiler = mem::replace(&mut self.compiler, enclosing);
+            return compiler.function;
+        } else {
+            panic!("Enclosing compiler not found");
+        }
     }
 }
 
@@ -520,6 +588,7 @@ struct Local {
 
 const STACK_SIZE: usize = 50000;
 struct Compiler {
+    enclosing: Option<Box<Compiler>>,
     function: ObjFunction,
     f_type: FunctionType,
     locals: Vec<Local>,
@@ -540,11 +609,12 @@ impl Compiler {
             depth: -1,
         };
         let compiler = Compiler {
+            enclosing: None,
             function,
             f_type,
             locals: vec![array_repeat_value; STACK_SIZE],
             scope_depth: 0,
-            total: 0,
+            total: 1, //0th slot for vm internal use
         };
 
         Box::new(compiler)
@@ -559,9 +629,8 @@ pub fn compile(source: String, gc: &mut Gc) -> Result<GcRef<ObjFunction>, Interp
     while !parser.match_token(TokenType::EOF) {
         parser.declaration();
     }
-    // parser.expression();
-    // parser.consume(TokenType::EOF, "Expected EOF");
-    let function = parser.end_compiler();
+    // let function = parser.end_compiler();
     // disassemble_chunk(chunk, "TEST");
-    Ok(function)
+    parser.emit_return();
+    Ok(parser.gc.alloc(parser.compiler.function))
 }
