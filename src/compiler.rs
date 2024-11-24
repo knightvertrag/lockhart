@@ -269,6 +269,8 @@ impl<'a> Parser<'a> {
             self.end_scope();
         } else if self.match_token(TokenType::IF) {
             self.if_statement();
+        } else if self.match_token(TokenType::RETURN) {
+            self.return_statement();
         } else if self.match_token(TokenType::WHILE) {
             self.while_statement();
         } else if self.match_token(TokenType::FOR) {
@@ -359,6 +361,18 @@ impl<'a> Parser<'a> {
         self.end_scope();
     }
 
+    fn return_statement(&mut self) {
+        if let FunctionType::SCRIPT = self.compiler.f_type {
+            panic!("Cannot return from top-level code");
+        }
+        if self.match_token(TokenType::SEMICOLON) {
+            self.emit_return();
+        } else {
+            self.expression();
+            self.consume(TokenType::SEMICOLON, "Expected ; after return statement");
+            self.emit_opcode(Opcode::OP_RETURN);
+        }
+    }
     fn expression_statement(&mut self) {
         self.expression();
         self.consume(TokenType::SEMICOLON, "Expected ; after expression");

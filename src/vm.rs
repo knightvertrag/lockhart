@@ -101,7 +101,6 @@ impl Vm {
     fn run(&mut self) -> Result<(), InterpretError> {
         unsafe {
             let mut frame = &mut *(&mut self.frames[self.frame_count - 1] as *mut CallFrame);
-            // let mut current_frame = self.frames[self.frame_count - 1];
             loop {
                 // disassemble_instruction(&frame.function.chunk, _i);
                 let op = (*frame.ip).0;
@@ -238,7 +237,7 @@ impl Vm {
                         frame.ip = frame.ip.offset(jump_size as isize);
                     }
                     Opcode::OP_LOOP(jump_size) => {
-                        frame.ip = frame.ip.offset(-1 - (jump_size as isize));
+                        frame.ip = frame.ip.offset(-(jump_size as isize));
                     }
                     Opcode::OP_CALL(arg_count) => {
                         self.call_value(arg_count)?;
