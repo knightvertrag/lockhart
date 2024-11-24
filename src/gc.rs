@@ -31,7 +31,13 @@ pub struct GcRef<T> {
     pointer: NonNull<T>,
 }
 
-impl<T> GcRef<T> {}
+impl<T> GcRef<T> {
+    pub fn dangling() -> GcRef<T> {
+        GcRef {
+            pointer: NonNull::dangling(),
+        }
+    }
+}
 
 impl<T> Deref for GcRef<T> {
     type Target = T;
@@ -83,17 +89,19 @@ impl Gc {
         }
     }
 
-    fn alloc<T>(&mut self, object: T) -> GcRef<T> {
+    pub fn alloc<T>(&mut self, object: T) -> GcRef<T> {
         unsafe {
             let boxed_o = Box::new(object);
             let ptr = NonNull::new_unchecked(Box::into_raw(boxed_o));
-            let mut header: NonNull<GcObject> = mem::transmute(ptr.as_ref());
+            // extract *mut T, then cast to GcObject, then transmute to NonNull 
+            let mut header: NonNull<GcObject> = mem::transmute(ptr.as_ptr());
             header.as_mut().next = self.first.take();
             self.first = Some(header);
             GcRef { pointer: ptr }
         }
     }
 
+    // check if string is already interned, if not then allocate and return reference
     pub fn intern(&mut self, s: String) -> GcRef<ObjString> {
         let o_string = ObjString::from_string(s);
         if let Some(value) = self.strings.find_string(&o_string.s, o_string.hash) {

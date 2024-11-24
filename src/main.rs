@@ -2,19 +2,18 @@ use std::{env, io};
 mod bytecode;
 mod chunk;
 mod compiler;
+mod gc;
 mod lexer;
+mod object;
 mod repl;
+mod source;
+mod table;
 mod token;
 mod value;
 mod vm;
-mod object;
-mod source;
-mod gc;
-mod table;
-use bytecode::Opcode;
-use chunk::{Chunk, Lineno};
-use source::{open_source_file, execute};
-use vm::Vm;
+
+use source::{execute, open_source_file};
+
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 1 {

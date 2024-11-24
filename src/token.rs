@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum TokenType {
     IDENT,
     NUM,
