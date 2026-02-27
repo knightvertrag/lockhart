@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::max, ptr::null};
+use std::ptr::null;
 
 use crate::{
     bytecode::Opcode,
@@ -100,12 +100,16 @@ impl Vm {
 
     fn run(&mut self) -> Result<(), InterpretError> {
         unsafe {
-            let mut frame = &mut *(&mut self.frames[self.frame_count - 1] as *mut CallFrame);
+            let mut frame_ptr = &mut self.frames[self.frame_count - 1] as *mut CallFrame;
             loop {
-                // disassemble_instruction(&frame.function.chunk, _i);
-                let op = (*frame.ip).0;
+                if self.gc.should_collect() {
+                    self.collect_garbage();
+                }
+
+                // disassemble_instruction(&(*frame_ptr).function.chunk, _i);
+                let op = (*(*frame_ptr).ip).0;
                 // println!("{:?}", op);
-                frame.ip = frame.ip.offset(1);
+                (*frame_ptr).ip = (*frame_ptr).ip.offset(1);
                 match op {
                     Opcode::OP_RETURN => {
                         let returned_value = self.pop();
@@ -114,12 +118,12 @@ impl Vm {
                             self.pop();
                             return Ok(());
                         }
-                        self.stack_top = frame.slot;
+                        self.stack_top = (*frame_ptr).slot;
                         self.push(returned_value);
-                        frame = &mut *(&mut self.frames[self.frame_count - 1] as *mut CallFrame);
+                        frame_ptr = &mut self.frames[self.frame_count - 1] as *mut CallFrame;
                     }
                     Opcode::OP_CONSTANT(idx) => {
-                        let constant = Vm::read_constant(&frame, idx);
+                        let constant = Vm::read_constant(&*frame_ptr, idx);
                         // println!("{}", constant);
                         self.push(constant);
                         // return InterpretResult::InterpretOk;
@@ -196,12 +200,12 @@ impl Vm {
                         self.pop();
                     }
                     Opcode::OP_DEFINE_GLOBAL(idx) => {
-                        let name = Vm::read_constant(&frame, idx).get_string().unwrap();
+                        let name = Vm::read_constant(&*frame_ptr, idx).get_string().unwrap();
                         let value = self.pop();
                         self.globals.set(name, value);
                     }
                     Opcode::OP_GET_GLOBAL(idx) => {
-                        let name = Vm::read_constant(&frame, idx).get_string().unwrap();
+                        let name = Vm::read_constant(&*frame_ptr, idx).get_string().unwrap();
                         if let Some(value) = self.globals.get(name) {
                             self.push(value.clone());
                         } else {
@@ -211,7 +215,7 @@ impl Vm {
                         }
                     }
                     Opcode::OP_SET_GLOBAL(idx) => {
-                        let name = Vm::read_constant(&frame, idx).get_string().unwrap();
+                        let name = Vm::read_constant(&*frame_ptr, idx).get_string().unwrap();
                         let value = self.peek(0);
                         if self.globals.set(name, value.clone()) {
                             self.globals.delete_entry(name);
@@ -221,32 +225,51 @@ impl Vm {
                         }
                     }
                     Opcode::OP_GET_LOCAL(slot_index) => {
-                        let offset = slot_index + frame.slot;
+                        let offset = slot_index + (*frame_ptr).slot;
                         self.push(self.stack[offset].clone());
                     }
                     Opcode::OP_SET_LOCAL(slot_index) => {
-                        let offset = slot_index + frame.slot;
+                        let offset = slot_index + (*frame_ptr).slot;
                         self.stack[offset] = self.peek(0).clone();
                     }
                     Opcode::OP_JUMP_IF_FALSE(jump_size) => {
                         if Value::is_falsey(self.peek(0)) {
-                            frame.ip = frame.ip.offset(jump_size as isize);
+                            (*frame_ptr).ip = (*frame_ptr).ip.offset(jump_size as isize);
                         }
                     }
                     Opcode::OP_JUMP(jump_size) => {
-                        frame.ip = frame.ip.offset(jump_size as isize);
+                        (*frame_ptr).ip = (*frame_ptr).ip.offset(jump_size as isize);
                     }
                     Opcode::OP_LOOP(jump_size) => {
-                        frame.ip = frame.ip.offset(-(jump_size as isize));
+                        (*frame_ptr).ip = (*frame_ptr).ip.offset(-(jump_size as isize));
                     }
                     Opcode::OP_CALL(arg_count) => {
                         self.call_value(arg_count)?;
-                        frame = &mut *(&mut self.frames[self.frame_count - 1] as *mut CallFrame);
+                        frame_ptr = &mut self.frames[self.frame_count - 1] as *mut CallFrame;
                     }
                 }
             }
         }
         // println!("{:?}", self.peek(0));
+    }
+
+    fn collect_garbage(&mut self) {
+        self.mark_roots();
+        self.gc.collect_garbage();
+    }
+
+    fn mark_roots(&mut self) {
+        for idx in 0..self.stack_top {
+            let value = self.stack[idx].clone();
+            self.gc.mark_value(&value);
+        }
+
+        for frame_index in 0..self.frame_count {
+            let function = self.frames[frame_index].function;
+            self.gc.mark_object(function);
+        }
+
+        self.gc.mark_table(&self.globals);
     }
 
     fn peek(&self, idx: usize) -> &Value {

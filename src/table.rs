@@ -218,3 +218,67 @@ impl Iterator for IterTable {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Table;
+    use crate::{gc::Gc, value::Value};
+
+    #[test]
+    fn set_get_and_overwrite() {
+        let mut gc = Gc::new();
+        let key = gc.intern("k".to_string());
+        let mut table = Table::new();
+
+        assert!(table.set(key, Value::NUMBER(1.0)));
+        assert_eq!(table.get(key).and_then(|v| v.get_number()), Some(1.0));
+
+        assert!(!table.set(key, Value::NUMBER(2.0)));
+        assert_eq!(table.get(key).and_then(|v| v.get_number()), Some(2.0));
+    }
+
+    #[test]
+    fn delete_entry_removes_key() {
+        let mut gc = Gc::new();
+        let key = gc.intern("x".to_string());
+        let mut table = Table::new();
+        table.set(key, Value::BOOL(true));
+
+        assert!(table.delete_entry(key));
+        assert!(table.get(key).is_none());
+    }
+
+    #[test]
+    fn iter_and_add_all_copy_entries() {
+        let mut gc = Gc::new();
+        let k1 = gc.intern("a".to_string());
+        let k2 = gc.intern("b".to_string());
+
+        let mut from = Table::new();
+        from.set(k1, Value::NUMBER(10.0));
+        from.set(k2, Value::NUMBER(20.0));
+
+        let mut seen = 0;
+        for _ in from.iter() {
+            seen += 1;
+        }
+        assert_eq!(seen, 2);
+
+        let mut to = Table::new();
+        to.add_all(&from);
+        assert_eq!(to.get(k1).and_then(|v| v.get_number()), Some(10.0));
+        assert_eq!(to.get(k2).and_then(|v| v.get_number()), Some(20.0));
+    }
+
+    #[test]
+    fn find_string_returns_interned_match() {
+        let mut gc = Gc::new();
+        let key = gc.intern("needle".to_string());
+        let hash = key.hash;
+        let mut table = Table::new();
+        table.set(key, Value::NIL);
+
+        let found = table.find_string("needle", hash);
+        assert!(found == Some(key));
+    }
+}
