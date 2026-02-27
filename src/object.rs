@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::{chunk::Chunk, gc::{GcObject, GcRef}};
 
 #[derive(Clone)]
@@ -12,13 +14,13 @@ pub struct ObjFunction {
     header: GcObject,
     pub arity: u8,
     pub chunk: Chunk,
-    name: GcRef<ObjString>,
+    pub name: GcRef<ObjString>,
 }
 
 impl ObjFunction {
     pub fn new(name: GcRef<ObjString>) -> ObjFunction {
         ObjFunction {
-            header: GcObject::new(ObjectType::FUNCTION),
+            header: GcObject::new(ObjectType::FUNCTION, size_of::<ObjFunction>()),
             arity: 0,
             chunk: Chunk::new(),
             name, 
@@ -46,7 +48,7 @@ impl ObjString {
     pub fn from_string(s: String) -> ObjString {
         let hash = ObjString::compute_hash(&s);
         ObjString {
-            header: GcObject::new(ObjectType::STRING),
+            header: GcObject::new(ObjectType::STRING, size_of::<ObjString>()),
             s,
             hash,
         }
