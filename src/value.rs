@@ -80,3 +80,43 @@ impl Display for Value {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{gc::Gc, value::Value};
+
+    #[test]
+    fn getters_return_typed_values() {
+        let mut gc = Gc::new();
+        let s = gc.intern("abc".to_string());
+
+        assert_eq!(Value::NUMBER(3.0).get_number(), Some(3.0));
+        assert_eq!(Value::BOOL(true).get_bool(), Some(true));
+        assert!(Value::STR(s).get_string() == Some(s));
+        assert_eq!(Value::NIL.get_number(), None);
+    }
+
+    #[test]
+    fn falsey_and_falsify_behavior() {
+        assert!(Value::is_falsey(&Value::NIL));
+        assert!(Value::is_falsey(&Value::NUMBER(0.0)));
+        assert!(!Value::is_falsey(&Value::NUMBER(1.0)));
+
+        assert!(Value::falsify(&Value::BOOL(false)));
+        assert!(!Value::falsify(&Value::BOOL(true)));
+        assert!(Value::falsify(&Value::NUMBER(0.0)));
+    }
+
+    #[test]
+    fn values_equal_checks_type_and_contents() {
+        let mut gc = Gc::new();
+        let a1 = gc.intern("a".to_string());
+        let a2 = gc.intern("a".to_string());
+
+        assert!(Value::values_equal(&Value::NUMBER(1.0), &Value::NUMBER(1.0)));
+        assert!(Value::values_equal(&Value::BOOL(true), &Value::BOOL(true)));
+        assert!(Value::values_equal(&Value::NIL, &Value::NIL));
+        assert!(Value::values_equal(&Value::STR(a1), &Value::STR(a2)));
+        assert!(!Value::values_equal(&Value::NUMBER(1.0), &Value::BOOL(true)));
+    }
+}
