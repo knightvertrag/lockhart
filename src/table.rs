@@ -165,7 +165,7 @@ impl Table {
         for i in 0..self.capacity {
             let entry = self.entries.add(i);
             if let Some(k) = (*entry).key {
-                let dest = Table::find_entry(entries, k, self.capacity);
+                let dest = Table::find_entry(entries, k, capacity);
                 (*dest).key = (*entry).key;
                 (*dest).value = (*entry).value.clone();
                 self.count += 1;

@@ -1,7 +1,7 @@
 use std::{
-    mem,
+    cell::Cell,
     mem::size_of,
-    ops::{Deref, DerefMut},
+    ops::Deref,
     ptr::NonNull,
 };
 
@@ -13,8 +13,8 @@ use crate::{
 
 #[repr(C)]
 pub struct GcObject {
-    marked: bool,
-    next: Option<NonNull<GcObject>>,
+    marked: Cell<bool>,
+    next: Cell<Option<NonNull<GcObject>>>,
     obj_type: ObjectType,
     size: usize,
 }
@@ -22,8 +22,8 @@ pub struct GcObject {
 impl GcObject {
     pub fn new(obj_type: ObjectType, size: usize) -> GcObject {
         GcObject {
-            marked: false,
-            next: None,
+            marked: Cell::new(false),
+            next: Cell::new(None),
             obj_type,
             size,
         }
@@ -31,6 +31,10 @@ impl GcObject {
 }
 pub struct GcRef<T> {
     pointer: NonNull<T>,
+}
+
+pub trait GcManaged {
+    fn header(&self) -> &GcObject;
 }
 
 impl<T> GcRef<T> {
@@ -46,12 +50,6 @@ impl<T> Deref for GcRef<T> {
 
     fn deref(&self) -> &Self::Target {
         unsafe { self.pointer.as_ref() }
-    }
-}
-
-impl<T> DerefMut for GcRef<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.pointer.as_mut() }
     }
 }
 
@@ -93,14 +91,14 @@ impl Gc {
         }
     }
 
-    pub fn alloc<T>(&mut self, object: T) -> GcRef<T> {
+    pub fn alloc<T: GcManaged>(&mut self, object: T) -> GcRef<T> {
         unsafe {
             self.bytes_allocated += size_of::<T>();
             let boxed_o = Box::new(object);
+            let header_ref = boxed_o.as_ref().header();
+            header_ref.next.set(self.first.take());
+            let header = NonNull::from(header_ref);
             let ptr = NonNull::new_unchecked(Box::into_raw(boxed_o));
-            // extract *mut T, then cast to GcObject, then transmute to NonNull 
-            let mut header: NonNull<GcObject> = mem::transmute(ptr.as_ptr());
-            header.as_mut().next = self.first.take();
             self.first = Some(header);
             GcRef { pointer: ptr }
         }
@@ -122,13 +120,13 @@ impl Gc {
         self.bytes_allocated > self.next_gc
     }
 
-    pub fn mark_object<T>(&mut self, reference: GcRef<T>) {
+    pub fn mark_object<T: GcManaged>(&mut self, reference: GcRef<T>) {
         unsafe {
-            let mut object = NonNull::new_unchecked(reference.pointer.as_ptr() as *mut GcObject);
-            if object.as_ref().marked {
+            let object = NonNull::from(reference.header());
+            if object.as_ref().marked.get() {
                 return;
             }
-            object.as_mut().marked = true;
+            object.as_ref().marked.set(true);
             self.grey_stack.push(object);
         }
     }
@@ -189,10 +187,10 @@ impl Gc {
         }
     }
 
-    fn is_marked<T>(reference: GcRef<T>) -> bool {
+    fn is_marked<T: GcManaged>(reference: GcRef<T>) -> bool {
         unsafe {
-            let object = NonNull::new_unchecked(reference.pointer.as_ptr() as *mut GcObject);
-            object.as_ref().marked
+            let object = NonNull::from(reference.header());
+            object.as_ref().marked.get()
         }
     }
 
@@ -201,17 +199,17 @@ impl Gc {
             let mut previous: Option<NonNull<GcObject>> = None;
             let mut current = self.first;
 
-            while let Some(mut object) = current {
-                if object.as_ref().marked {
-                    object.as_mut().marked = false;
+            while let Some(object) = current {
+                if object.as_ref().marked.get() {
+                    object.as_ref().marked.set(false);
                     previous = Some(object);
-                    current = object.as_ref().next;
+                    current = object.as_ref().next.get();
                 } else {
                     let unreached = object;
-                    current = object.as_ref().next;
+                    current = object.as_ref().next.get();
 
-                    if let Some(mut prev) = previous {
-                        prev.as_mut().next = current;
+                    if let Some(prev) = previous {
+                        prev.as_ref().next.set(current);
                     } else {
                         self.first = current;
                     }
@@ -243,7 +241,7 @@ impl Drop for Gc {
         unsafe {
             let mut current = self.first;
             while let Some(object) = current {
-                current = object.as_ref().next;
+                current = object.as_ref().next.get();
                 self.free_object(object);
             }
         }
