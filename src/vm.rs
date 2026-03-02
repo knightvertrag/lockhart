@@ -4,7 +4,7 @@ use crate::{
     bytecode::Opcode,
     chunk::{disassemble::disassemble_instruction, Chunk, Lineno},
     compiler::compile,
-    gc::{Gc, GcRef},
+    gc::{Gc, GcManaged, GcRef},
     object::ObjFunction,
     table::Table,
     value::Value,
@@ -94,7 +94,7 @@ impl Vm {
         return self.run();
     }
 
-    fn alloc<T>(&mut self, object: T) -> GcRef<T> {
+    fn alloc<T: GcManaged>(&mut self, object: T) -> GcRef<T> {
         self.gc.alloc(object)
     }
 

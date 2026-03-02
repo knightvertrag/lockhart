@@ -1,6 +1,9 @@
 use std::mem::size_of;
 
-use crate::{chunk::Chunk, gc::{GcObject, GcRef}};
+use crate::{
+    chunk::Chunk,
+    gc::{GcManaged, GcObject, GcRef},
+};
 
 #[derive(Clone)]
 pub enum ObjectType {
@@ -25,6 +28,12 @@ impl ObjFunction {
             chunk: Chunk::new(),
             name, 
         }
+    }
+}
+
+impl GcManaged for ObjFunction {
+    fn header(&self) -> &GcObject {
+        &self.header
     }
 }
 
@@ -61,6 +70,12 @@ impl ObjString {
             hash = hash.wrapping_mul(16777619);
         }
         hash
+    }
+}
+
+impl GcManaged for ObjString {
+    fn header(&self) -> &GcObject {
+        &self.header
     }
 }
 
