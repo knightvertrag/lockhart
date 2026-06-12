@@ -142,6 +142,6 @@ Prints offset, lineno, and opcode. Constant-bearing instructions also print the 
 Adding a new opcode requires changes in **four places**:
 
 1. `bytecode.rs` — enum variant
-2. `compiler.rs` — emission site(s)
+2. `codegen/emit.rs` — emission site(s)
 3. `vm.rs` — `run()` match arm
 4. `chunk/disassemble.rs` — optional debug printing
