@@ -1,10 +1,13 @@
 use std::{env, io};
+mod ast;
 mod bytecode;
 mod chunk;
+mod codegen;
 mod compiler;
 mod gc;
 mod lexer;
 mod object;
+mod parser;
 mod repl;
 mod source;
 mod table;
