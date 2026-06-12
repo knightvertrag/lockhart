@@ -2,7 +2,7 @@
 
 **Source:** `src/ast/`  
 **Produced by:** `src/parser/`  
-**Consumed by:** `src/codegen/`
+**Consumed by:** `src/codegen/`, `src/ast/pretty.rs`
 
 Lockhart parses source into a typed AST before bytecode emission.
 
@@ -10,6 +10,7 @@ Lockhart parses source into a typed AST before bytecode emission.
 
 ```
 Lexer → Parser → Program AST → Codegen → ObjFunction
+                              └→ pretty (debug)
 ```
 
 ## Module Layout
@@ -20,8 +21,8 @@ Lexer → Parser → Program AST → Codegen → ObjFunction
 | `expr.rs` | `Expr`, literals, operators |
 | `stmt.rs` | `Stmt`, `BlockStmt`, control flow |
 | `decl.rs` | `Decl`, `VarDecl`, `FnDecl` |
-| `visit.rs` | `Visitor` trait for traversal |
-| `pretty.rs` | Tree and JSON AST dump for visualization |
+| `visit.rs` | `Visitor` trait (not yet used by passes) |
+| `pretty.rs` | Tree and JSON dump |
 | `mod.rs` | `Program` root |
 
 ## Program Root
@@ -37,8 +38,8 @@ pub struct Program {
 - `Literal` — number, string, bool, nil
 - `Variable` — identifier reference
 - `Unary` — `-`, `!`
-- `Binary` — arithmetic and comparisons (including `>=`, `<=`, `!=` as distinct ops)
-- `Logical` — `and`, `or` (short-circuit preserved in tree; codegen emits jumps)
+- `Binary` — arithmetic and comparisons (`>=`, `<=`, `!=` as distinct ops)
+- `Logical` — `and`, `or` (short-circuit in codegen via jumps)
 - `Assign` — `name = expr`
 - `Call` — `callee(args...)`
 - `Grouping` — parenthesized subexpression
@@ -61,31 +62,42 @@ pub struct Program {
 
 ## Spans
 
-Every node is wrapped in `Spanned<T>` with byte offsets and line number from the lexer. Used for `ParseError` messages and future tooling.
+Every node is wrapped in `Spanned<T>`:
+
+```rust
+pub struct Span {
+    pub start: usize,  // byte offset
+    pub end: usize,
+    pub line: usize,   // start line (1-based)
+}
+```
+
+Line numbers come from the lexer (`read_char` increments on `\n`). Parser captures start line at construct begin, not the closing token's line.
 
 ## Codegen
 
-`src/codegen/emit.rs` walks the AST and emits opcodes. Scope resolution, string interning, and `ObjFunction` allocation happen only in codegen — the parser is GC-free.
+`src/codegen/emit.rs` walks the AST. Scope resolution, string interning, and `ObjFunction` allocation happen only in codegen.
 
 ## Dumping / Visualization
-
-Parse and print the AST without running the VM:
 
 ```bash
 cargo run -- --dump-ast test.lh
 cargo run -- --dump-ast --format json test.lh
 ```
 
-**Tree** (default) — indented, human-readable output with line numbers.
-
-**JSON** — structured output for external tools (`"type"` field on every node).
+| Format | Description |
+|--------|-------------|
+| Tree | Indented output with `[line N]` annotations |
+| JSON | `"type"` field on every node; includes spans |
 
 ### VS Code launch configs
 
 | Config | Behavior |
 |--------|----------|
-| Dump AST (current file) | Tree dump of `${file}` in integrated terminal |
+| Dump AST (current file) | Tree dump of `${file}` |
 | Dump AST JSON (current file) | JSON dump of `${file}` |
 | Dump AST (test.lh) | Tree dump of `test.lh` |
 
-Open a `.lh` file, save it, then run the desired config from Run and Debug.
+## Future Work
+
+See [ast-migration.md](./ast-migration.md) for the roadmap: semantic pass, visitor refactor, error unification, and new language feature nodes.

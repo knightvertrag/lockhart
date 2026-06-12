@@ -5,6 +5,8 @@
 
 Stack-based bytecode interpreter. One `Vm` instance owns the GC, operand stack, call frames, and global variable table.
 
+Compilation reaches the VM through `compiler::compile` → `parser::parse` → `codegen::compile_ast`. See [compiler.md](./compiler.md).
+
 ## Vm State
 
 ```rust

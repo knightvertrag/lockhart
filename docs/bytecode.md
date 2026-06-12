@@ -6,6 +6,8 @@
 
 Each compiled function (including the top-level script) owns a `Chunk`: a sequence of `(Opcode, Lineno)` pairs plus a constant pool of `Value`s.
 
+Chunks are produced by `codegen::compile_ast` from the AST. See [compiler.md](./compiler.md).
+
 ## Chunk Structure
 
 ```rust

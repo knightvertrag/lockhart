@@ -4,16 +4,16 @@
 **Tests:** `src/lexer/tests.rs`  
 **Depends on:** `src/token.rs`
 
-The lexer converts a source `String` into a stream of `Token` values. It is a hand-written scanner with single-character lookahead (`peek_ahead`).
+The lexer converts a source `String` into a stream of `Token` values with byte offsets and line numbers.
 
 ## Public API
 
 ```rust
 pub struct Lexer {
     input: String,
-    position: usize,      // index of ch
-    read_position: usize, // index of next char to read
-    ch: u8,               // current char (0 = EOF)
+    position: usize,
+    read_position: usize,
+    ch: u8,
     lineno: usize,
 }
 
@@ -21,95 +21,64 @@ impl Lexer {
     pub fn new(input: String) -> Lexer;
     pub fn next_token(&mut self) -> Token;
 }
-
-impl Iterator for Lexer {
-    type Item = Token;
-    // yields tokens until EOF, then None
-}
 ```
 
-The compiler uses `Lexer` directly via `lexer.next_token()` inside `Parser::advance()`.
+## Line Number Tracking
+
+Line increments happen **only** in `read_char` when consuming `\n`. `skip_whitespace` does not increment separately — this avoids double-counting newlines between tokens.
+
+At the start of each `next_token()`:
+
+```rust
+let start = self.position;
+let lineno = self.lineno;  // captured before reading token bytes
+```
 
 ## Scanning Algorithm
 
-Each `next_token()` call:
+Each `next_token()` call (in a loop for comment skip):
 
-1. **`skip_whitespace`** — skips ASCII whitespace; increments `lineno` on `\n`.
-2. **EOF check** — if `read_position > input.len()`, return `TokenType::EOF`.
-3. **Dispatch on `ch`**:
-   - **Operators** — lookup in `token::OPERATORS` phf map. Multi-char operators use `build_double` (peek ahead for `=`, etc.).
-   - **String** — `"` starts `read_literal()` (no escape sequences).
-   - **Delimiters** — lookup in `token::DELIMITERS`.
-   - **Identifier** — `is_letter` (ASCII alpha + `_`), then `read_identifier`. Keyword check via `Token::check_keyword`.
-   - **Number** — `is_number` (ASCII digit), `read_identifier` with digit predicate.
-   - **Illegal** — `panic!("illegal identifier")` for unrecognized chars.
+1. `skip_whitespace` — skip ASCII whitespace via `read_char`
+2. EOF check
+3. Dispatch: operators (with `//` comment skip), strings, delimiters, identifiers, numbers
+4. Return token with `start`, `end`, `lineno`
 
-4. **`read_char`** — advance `position`/`read_position`, update `ch`.
+## Token Fields
 
-## Token Literal Contents
-
-| Token kind | `literal` field |
-|------------|-----------------|
-| `NUM` | Raw digit sequence (parsed to `f64` in compiler) |
-| `STRING` | Characters between quotes (no quotes in literal) |
-| `IDENT` | Identifier text |
-| Keywords | Keyword text (`let`, `fn`, etc.) |
-| Operators/delimiters | The operator/delimiter character(s) |
-
-Every token carries `lineno` — the line where the token **started** (used by compiler for `Lineno` in chunk emission).
+| Field | Meaning |
+|-------|---------|
+| `literal` | Token text |
+| `lineno` | Start line (1-based) |
+| `start` / `end` | Byte offsets in source |
 
 ## Multi-Character Operators
 
-Handled in the `ASSIGN`, `GT`, `LT`, `NOT` match arms:
-
 | First char | Peek `=` | Result |
 |------------|----------|--------|
-| `=` | yes | `EQ` (`==`) |
-| `=` | no | `ASSIGN` (`=`) |
-| `>` | yes | `GEQ` (`>=`) |
-| `<` | yes | `LEQ` (`<=`) |
-| `!` | yes | `NEQ` (`!=`) |
-| `!` | no | `NOT` (`!`) |
+| `=` | yes/no | `EQ` / `ASSIGN` |
+| `>` | yes/no | `GEQ` / `GT` |
+| `<` | yes/no | `LEQ` / `LT` |
+| `!` | yes/no | `NEQ` / `NOT` |
 
 ## Comments
 
-`//` line comments: when `/` is seen and next char is `/`, consume until newline (comment is not emitted as a token).
+`//` line comments: consume until newline, return `ILLEGAL` token (discarded by parser loop on next call).
 
-## Identifiers and Keywords
-
-Identifiers: `[a-zA-Z_][a-zA-Z0-9_]*` (ASCII only).
-
-Keywords resolved at lex time via `KEYWORDS` map in `token.rs`: `let`, `fn`, `print`, `true`, `false`, `return`, `if`, `else`, `and`, `or`, `for`, `while`, `nil`.
-
-Non-keyword identifiers become `TokenType::IDENT`.
-
-## Numbers
-
-Integer digit sequences only (no decimal point, no exponent). The compiler parses `literal` as `f64` via `.parse::<f64>().unwrap()`.
-
-## Strings
-
-Delimited by `"`. No escape sequence support — backslashes and quotes inside strings are not handled specially. Reading stops at the next `"`.
-
-## Error Behavior
-
-- Unrecognized characters: `panic!("illegal identifier")`
-- No recovery or error tokens (`ILLEGAL` is defined but not produced in normal paths)
-
-## Integration with Compiler
+## Integration with Parser
 
 ```rust
-// compiler.rs — Parser::advance
+// parser/mod.rs
 fn advance(&mut self) {
     self.previous = self.current.clone();
     self.current = self.lexer.next_token();
 }
 ```
 
-`Parser::new` creates the lexer; `parser.advance()` is called once before the parse loop to prime `current`.
+Parser builds `ast::Span` from token offsets and start line. See [tokens.md](./tokens.md).
 
-## Design Notes for LLMs
+## Design Notes
 
-- Lexer is **not** responsible for keyword semantics — only classification.
-- `TokenType` discriminant order must match `RULES` array indexing in `parse_rule.rs` (both use `as usize` on the enum).
-- Line numbers may be incremented both in `read_char` (on `\n`) and `skip_whitespace` — be careful when debugging lineno issues.
+- `TokenType` order must match `RULES` array in `parser/parse_rule.rs`
+- Numbers: integer digits only; parsed to `f64` in parser
+- Strings: no escape sequences
+- Illegal chars: `panic!` (lexer-level; parser uses `ParseError`)

@@ -11,8 +11,12 @@ Lockhart compiles source in two phases: parse to AST, then lower AST to bytecode
 
 ```rust
 pub fn compile(source: String, gc: &mut Gc) -> Result<GcRef<ObjFunction>, InterpretError> {
-    let program = parser::parse(&source)?;
-    codegen::compile_ast(&program, gc)
+    let program = parser::parse(&source).map_err(|e| {
+        InterpretError::InterpretCompileError(e.to_string())
+    })?;
+    codegen::compile_ast(&program, gc).map_err(|e| {
+        InterpretError::InterpretCompileError(e.to_string())
+    })
 }
 ```
 
@@ -24,12 +28,13 @@ pub fn compile(source: String, gc: &mut Gc) -> Result<GcRef<ObjFunction>, Interp
 pub fn parse(source: &str) -> Result<Program, ParseError>;
 ```
 
-- **GC-free** — stores raw strings in AST literals; no bytecode emission
+- **GC-free** — raw strings in AST literals; no bytecode emission
 - **Expressions** — Pratt parser via `parse_rule.rs` + `precedence.rs`
-- **Statements/declarations** — recursive descent in `mod.rs`
-- **Errors** — `ParseError` with line numbers (replaces panics)
+- **Statements** — recursive descent in `mod.rs`
+- **Errors** — `ParseError` with `[line N]` messages
+- **Spans** — start line captured at construct begin via `span_since(start, line)`
 
-### Statement parsing
+### Statement → AST mapping
 
 | Construct | AST output |
 |-----------|------------|
@@ -49,22 +54,26 @@ pub fn parse(source: &str) -> Result<Program, ParseError>;
 pub fn compile_ast(program: &Program, gc: &mut Gc) -> Result<GcRef<ObjFunction>, CompileError>;
 ```
 
-`Codegen` in `emit.rs` walks the AST and emits opcodes into `ObjFunction.chunk`:
+`Codegen` in `emit.rs` walks the AST:
 
 - Scope management (`begin_scope` / `end_scope`, locals table)
 - Jump patching for `if`, `while`, `for`, `and`, `or`
-- String interning and nested function allocation via `Gc`
+- String interning and nested `ObjFunction` allocation via `Gc`
 - Global/local variable resolution at compile time
 
-### Opcode mapping
+### Planned refactor
 
-See [bytecode.md](./bytecode.md). Logical operators and control flow use the same jump patterns as the previous direct-to-bytecode compiler.
+Move name resolution to a semantic pass (see [ast-migration.md](./ast-migration.md) Phase 1). Refactor emit to implement `Visitor` (Phase 2).
 
 ## Testing
 
-- **Parser tests:** `src/parser/tests.rs` — AST shape and parse errors
-- **Integration:** `src/vm/tests.rs` — end-to-end (29 tests)
+| Layer | File | Count |
+|-------|------|-------|
+| Parser | `src/parser/tests.rs` | 5 |
+| AST pretty | `src/ast/pretty.rs` | 3 |
+| VM integration | `src/vm/tests.rs` | 11 |
+| Other units | lexer, chunk, value, table | 15 |
 
 ```bash
-cargo test
+cargo test   # 34 total
 ```

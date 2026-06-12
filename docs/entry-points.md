@@ -9,12 +9,14 @@
 ```rust
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
+    if args.iter().any(|a| a == "--dump-ast") {
+        dump_ast_cli(&args);
+        return Ok(());
+    }
     if args.len() == 1 {
-        println!("===============Lockhart initiated===============");
         repl::start();
     } else {
-        let code = open_source_file(&args[1]);
-        execute(code);
+        execute(open_source_file(&args[1]));
     }
     Ok(())
 }
@@ -24,93 +26,82 @@ fn main() -> io::Result<()> {
 |------------|----------|
 | `cargo run` | Start REPL |
 | `cargo run -- test.lh` | Execute file |
+| `cargo run -- --dump-ast test.lh` | AST tree dump |
+| `cargo run -- --dump-ast --format json test.lh` | AST JSON dump |
 
 Module tree declared in `main.rs`:
 
 ```
-bytecode, chunk, compiler, gc, lexer, object, repl, source, table, token, value, vm
+ast, bytecode, chunk, codegen, compiler, gc, lexer, object,
+parser, repl, source, table, token, value, vm
 ```
+
+## AST Dump (`--dump-ast`)
+
+Parse-only path — no VM, no GC:
+
+```
+open_source_file → parser::parse → ast::pretty::dump_program
+```
+
+- `--format tree` (default) — indented tree with line numbers
+- `--format json` — structured JSON for external tools
+- Exit code `1` on parse failure
+
+See [ast.md](./ast.md) for VS Code launch configs.
 
 ## REPL (`repl.rs`)
 
 Uses `rustyline::Editor` for line input.
 
-```rust
-pub fn start() {
-    let mut rl = Editor::<()>::new();
-    let mut interpreter = Vm::init_vm();
-    loop {
-        let readline = rl.readline(">> ");
-        match readline {
-            Ok(line) => {
-                interpreter.interpret(line).unwrap_or_else(|err| {
-                    println!("{:?}", err);
-                });
-            }
-            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
-            Err(err) => panic!("{}", err),
-        }
-    }
-}
-```
-
-Characteristics:
-
-- **Single persistent VM** — globals survive across lines.
-- **No multi-line input** — each line is a complete compilation unit (must be valid declarations/statements ending appropriately).
-- Errors printed via `Debug` format, execution continues.
-- Ctrl-C / Ctrl-D exit the loop.
+- **Single persistent VM** — globals survive across lines
+- **No multi-line input** — each line is a complete compilation unit
+- Errors printed via `Debug` format; execution continues
+- Ctrl-C / Ctrl-D exit
 
 ## File Execution (`source.rs`)
 
-```rust
-pub fn open_source_file(file_name: &str) -> String;
-pub fn execute(code: String);
-```
-
-- `open_source_file` — reads entire file to `String`; panics on I/O error.
-- `execute` — fresh `Vm::init_vm()`, runs `interpret`, prints `Error: {:?}` on failure.
+- `open_source_file` — reads file to `String`; panics on I/O error
+- `execute` — fresh `Vm::init_vm()`, runs `interpret`, prints errors
 
 Each file run gets a **new VM** (no persisted state).
 
-## Execution Pipeline (shared)
-
-Both modes ultimately call:
+## Execution Pipeline (REPL and file)
 
 ```
 Vm::interpret(source)
-  → compile(source, &mut vm.gc)     // compiler.rs
+  → compile(source, &mut gc)        // compiler.rs
+      → parser::parse(source)       // AST
+      → codegen::compile_ast(...)   // bytecode
   → push script function
   → call(function, 0)
-  → run()                           // opcode loop
+  → run()
 ```
 
-## Example Program (`test.lh`)
+## VS Code Launch Configs
 
-```lh
-fn loop(a, b) {
-    return a + b;
-}
+| Config | Purpose |
+|--------|---------|
+| Debug 'lockhart' repl | REPL in external terminal |
+| Debug executable 'lockhart' | Run `test.lh` under debugger |
+| Dump AST (current file) | Tree dump of active `.lh` file |
+| Dump AST JSON (current file) | JSON dump of active file |
+| Dump AST (test.lh) | Tree dump of `test.lh` |
+| Debug unit tests | Run test binary under debugger |
 
-print loop(10, 20);
-```
-
-Note: `loop` is a user-defined function name (not a keyword).
+Configs in `.vscode/launch.json`.
 
 ## Build and Test
 
 ```bash
 cargo build
-cargo test      # 24 tests
+cargo test   # 34 tests
 ```
-
-## VS Code
-
-`.vscode/launch.json` and `settings.json` exist for IDE debugging (not part of runtime architecture).
 
 ## Implications for LLM-Assisted Development
 
-- **REPL testing**: wrap snippets as complete statements with semicolons.
-- **Global persistence**: only in REPL — re-run `Vm::init_vm()` in tests for isolation.
-- **Error surfaces**: parser panics crash REPL line; VM errors are caught and printed.
-- **No module system**: single compilation unit per `interpret` call.
+- **REPL testing**: wrap snippets as complete statements with semicolons
+- **Global persistence**: only in REPL — use fresh `Vm` in tests for isolation
+- **Parse errors**: structured `ParseError`, not panics
+- **AST inspection**: use `--dump-ast` or VS Code dump configs before debugging codegen
+- **No module system**: single compilation unit per `interpret` call

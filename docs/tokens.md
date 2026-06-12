@@ -1,7 +1,7 @@
 # Tokens
 
 **Source:** `src/token.rs`  
-**Consumed by:** `src/lexer.rs`, `src/compiler.rs`, `src/compiler/parse_rule.rs`
+**Consumed by:** `src/lexer.rs`, `src/parser/`
 
 Defines the token type system and compile-time lookup tables for keywords, operators, and delimiters.
 
@@ -20,7 +20,7 @@ pub enum TokenType {
 }
 ```
 
-**Important:** Variant declaration order determines discriminant values (`0..35`). The parse rule table `RULES` in `parse_rule.rs` is indexed by `token_type as usize` and has exactly **36** entries. Adding/reordering variants requires updating `RULES`.
+**Important:** Variant order determines discriminant values (`0..35`). The parse rule table `RULES` in `src/parser/parse_rule.rs` has exactly **36** entries indexed by `token_type as usize`.
 
 ## Token Struct
 
@@ -30,74 +30,48 @@ pub struct Token {
     pub type_: TokenType,
     pub literal: String,
     pub lineno: usize,
+    pub start: usize,
+    pub end: usize,
 }
 ```
 
-- `PartialEq` / `Eq` compare `type_` and `literal`.
-- `Hash` hashes only `literal` (used if tokens are hashed).
-- `Token::new_def()` creates an `ILLEGAL` placeholder for parser initialization.
+- `lineno` — 1-based line where the token **starts**
+- `start` / `end` — byte offsets into source for `Span` construction
+- `Token::span()` → `ast::Span`
+- `Token::new_def()` — `ILLEGAL` placeholder for parser initialization
 
 ## Keyword Resolution
-
-```rust
-pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! { ... };
-
-pub fn check_keyword(ident: &String) -> TokenType {
-    KEYWORDS.get(ident).cloned().unwrap_or(TokenType::IDENT)
-}
-```
 
 | Keyword | TokenType |
 |---------|-----------|
 | `let` | `LET` |
 | `fn` | `FUNCTION` |
 | `print` | `PRINT` |
-| `true` | `TRUE` |
-| `false` | `FALSE` |
+| `true` / `false` / `nil` | `TRUE` / `FALSE` / `NIL` |
 | `return` | `RETURN` |
-| `if` | `IF` |
-| `else` | `ELSE` |
-| `and` | `AND` |
-| `or` | `OR` |
-| `for` | `FOR` |
-| `while` | `WHILE` |
-| `nil` | `NIL` |
+| `if` / `else` | `IF` / `ELSE` |
+| `and` / `or` | `AND` / `OR` |
+| `for` / `while` | `FOR` / `WHILE` |
 
-## Operator Map
-
-```rust
-pub static OPERATORS: phf::Map<&'static str, TokenType> = phf_map! { ... };
-```
-
-Single-character keys. Multi-char operators (`==`, `!=`, etc.) are built by the lexer, not stored in this map.
-
-## Delimiter Map
-
-```rust
-pub static DELIMITERS: phf::Map<&'static str, TokenType> = phf_map! { ... };
-```
-
-Maps `{ } ( ) , ;` to their token types.
+Resolved at lex time via `KEYWORDS` phf map. Non-keywords become `IDENT`.
 
 ## Parser Token Utilities
 
-The compiler's `Parser` uses these patterns:
-
 ```rust
-fn check_token_type(&self, type_: TokenType) -> bool;
-fn match_token(&mut self, type_: TokenType) -> bool;  // advance if match
-fn consume(&mut self, type_: TokenType, err: &str);   // advance or panic
+fn check(&self, type_: TokenType) -> bool;
+fn match_token(&mut self, type_: TokenType) -> bool;
+fn consume(&mut self, type_: TokenType, expected: &str) -> Result<(), ParseError>;
 ```
 
-- `previous` — last consumed token (used for literal values, lineno).
-- `current` — lookahead token.
+- `previous` — last consumed token
+- `current` — lookahead token
 
-## Grammar Hints (from token usage)
+## Grammar Hints
 
-Statements and declarations are distinguished in `Parser::declaration()`:
+`Parser::declaration()` dispatch:
 
 - `fn` → function declaration
 - `let` → variable declaration
-- else → statement (`print`, block, `if`, `return`, `while`, `for`, or expression statement)
+- else → statement
 
-All statements/expressions end with `;` except block bodies and control-flow heads which use explicit `consume` calls for delimiters.
+All statements/expressions end with `;` except block bodies and control-flow heads.
