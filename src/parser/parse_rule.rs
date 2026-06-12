@@ -55,8 +55,20 @@ pub static RULES: [ParseRule; 36] = {
     rule!(a, NOT, Some(Parser::parse_unary_expr), None, PrecNone);
     rule!(a, GT, None, Some(Parser::parse_binary_expr), PrecComparison);
     rule!(a, LT, None, Some(Parser::parse_binary_expr), PrecComparison);
-    rule!(a, GEQ, None, Some(Parser::parse_binary_expr), PrecComparison);
-    rule!(a, LEQ, None, Some(Parser::parse_binary_expr), PrecComparison);
+    rule!(
+        a,
+        GEQ,
+        None,
+        Some(Parser::parse_binary_expr),
+        PrecComparison
+    );
+    rule!(
+        a,
+        LEQ,
+        None,
+        Some(Parser::parse_binary_expr),
+        PrecComparison
+    );
     rule!(a, EQ, None, Some(Parser::parse_binary_expr), PrecEquality);
     rule!(a, NEQ, None, Some(Parser::parse_binary_expr), PrecEquality);
     rule!(a, PLUS, None, Some(Parser::parse_binary_expr), PrecTerm);

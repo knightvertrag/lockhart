@@ -21,6 +21,7 @@ Lexer → Parser → Program AST → Codegen → ObjFunction
 | `stmt.rs` | `Stmt`, `BlockStmt`, control flow |
 | `decl.rs` | `Decl`, `VarDecl`, `FnDecl` |
 | `visit.rs` | `Visitor` trait for traversal |
+| `pretty.rs` | Tree and JSON AST dump for visualization |
 | `mod.rs` | `Program` root |
 
 ## Program Root
@@ -65,3 +66,26 @@ Every node is wrapped in `Spanned<T>` with byte offsets and line number from the
 ## Codegen
 
 `src/codegen/emit.rs` walks the AST and emits opcodes. Scope resolution, string interning, and `ObjFunction` allocation happen only in codegen — the parser is GC-free.
+
+## Dumping / Visualization
+
+Parse and print the AST without running the VM:
+
+```bash
+cargo run -- --dump-ast test.lh
+cargo run -- --dump-ast --format json test.lh
+```
+
+**Tree** (default) — indented, human-readable output with line numbers.
+
+**JSON** — structured output for external tools (`"type"` field on every node).
+
+### VS Code launch configs
+
+| Config | Behavior |
+|--------|----------|
+| Dump AST (current file) | Tree dump of `${file}` in integrated terminal |
+| Dump AST JSON (current file) | JSON dump of `${file}` |
+| Dump AST (test.lh) | Tree dump of `test.lh` |
+
+Open a `.lh` file, save it, then run the desired config from Run and Debug.

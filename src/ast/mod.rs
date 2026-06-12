@@ -1,5 +1,6 @@
 pub mod decl;
 pub mod expr;
+pub mod pretty;
 pub mod span;
 pub mod stmt;
 pub mod visit;
