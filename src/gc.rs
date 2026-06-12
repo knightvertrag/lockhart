@@ -132,10 +132,10 @@ impl Gc {
     }
 
     pub fn mark_value(&mut self, value: &Value) {
-        if let Value::STR(s) = value {
-            self.mark_object(*s);
-        } else if let Value::FUNCTION(f) = value {
-            self.mark_object(*f);
+        match value {
+            Value::STR(s) => self.mark_object(*s),
+            Value::FUNCTION(f) => self.mark_object(*f),
+            _ => {}
         }
     }
 

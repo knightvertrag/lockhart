@@ -45,6 +45,8 @@ pub struct Token {
     pub type_: TokenType,
     pub literal: String,
     pub lineno: usize,
+    pub start: usize,
+    pub end: usize,
 }
 
 impl PartialEq for Token {
@@ -62,11 +64,13 @@ impl std::hash::Hash for Token {
 }
 
 impl Token {
-    pub fn new(type_: TokenType, literal: String, lineno: usize) -> Token {
+    pub fn new(type_: TokenType, literal: String, lineno: usize, start: usize, end: usize) -> Token {
         Token {
             type_,
             literal,
             lineno,
+            start,
+            end,
         }
     }
 
@@ -75,7 +79,13 @@ impl Token {
             type_: TokenType::ILLEGAL,
             literal: "".to_string(),
             lineno: 0,
+            start: 0,
+            end: 0,
         }
+    }
+
+    pub fn span(&self) -> crate::ast::Span {
+        crate::ast::Span::new(self.start, self.end, self.lineno)
     }
 
     pub fn check_keyword(ident: &String) -> TokenType {

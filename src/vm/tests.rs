@@ -95,6 +95,20 @@ fn wrong_arity_returns_runtime_error() {
 }
 
 #[test]
+fn return_outside_function_returns_compile_error() {
+    let mut vm = Vm::init_vm();
+    let err = vm
+        .interpret("return 1;".to_string())
+        .expect_err("expected compile error");
+    match err {
+        InterpretError::InterpretCompileError(msg) => {
+            assert!(msg.contains("Cannot return from top-level code"));
+        }
+        _ => panic!("expected compile error"),
+    }
+}
+
+#[test]
 fn adding_invalid_operands_returns_runtime_error() {
     let err = run_err("let x = true + 1;");
     match err {

@@ -46,6 +46,20 @@ impl core::fmt::Display for ObjFunction {
         }
     }
 }
+
+#[repr(C)]
+pub struct ObjNativeFunction {
+    header: GcObject,
+    pub arity: u8,
+    pub function: fn(&[crate::value::Value]) -> crate::value::Value,
+}
+
+impl GcManaged for ObjNativeFunction {
+    fn header(&self) -> &GcObject {
+        &self.header
+    }
+}
+
 #[repr(C)]
 pub struct ObjString {
     header: GcObject,

@@ -55,16 +55,14 @@ impl Lexer {
 
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
-            if self.ch == '\n' as u8 {
-                self.lineno += 1;
-            }
             self.read_char();
         }
     }
 
-    /// can read both identifiers and numbers based on f
-    /// ## Arguments
-    /// * `f` - checker function for digit or alphabet
+    fn token(&self, type_: TokenType, literal: String, lineno: usize, start: usize, end: usize) -> Token {
+        Token::new(type_, literal, lineno, start, end)
+    }
+
     fn read_identifier(&mut self, f: fn(u8) -> bool) -> String {
         let position = self.position;
         while f(self.ch) {
@@ -81,79 +79,115 @@ impl Lexer {
         }
         self.input[position..self.position].to_string()
     }
-    pub fn next_token(&mut self) -> Token {
-        self.skip_whitespace();
-        if self.read_position > self.input.len() {
-            return Token::new(TokenType::EOF, "".to_string(), self.lineno)
+
+    fn skip_line_comment(&mut self) {
+        while self.ch != '\n' as u8 && self.ch != 0 {
+            self.read_char();
         }
-        let mut token = Token::new(TokenType::ILLEGAL, "".to_string(), self.lineno);
+    }
 
-        let current_char = (self.ch as char).to_string();
-        if let Some(tok) = token::OPERATORS.get(&current_char) {
-            let mut build_double = |t, next_ch: char, lit: &str| {
-                if self.peek_ahead() == Some(next_ch as u8) {
-                    let mut literal = lit.to_string();
-                    literal.push(next_ch);
-                    token = Token::new(t, literal, self.lineno);
-                    self.read_char();
-                } else {
-                    token = Token::new(tok.clone(), lit.to_string(), self.lineno);
-                }
-            };
-
-            match tok {
-                TokenType::ASSIGN => {
-                    build_double(TokenType::EQ, '=', "=");
-                }
-                TokenType::GT => {
-                    build_double(TokenType::GEQ, '=', ">");
-                }
-                TokenType::LT => {
-                    build_double(TokenType::LEQ, '=', "<");
-                }
-                TokenType::NOT => {
-                    build_double(TokenType::NEQ, '=', "!");
-                }
-                TokenType::DIV => {
-                    // Check for comment
-                    if self.peek_ahead() == Some('/' as u8) {
-                        while self.ch != '\n' as u8 {
-                            self.read_char();
-                        }
-                    } else {
-                        token = Token::new(tok.clone(), current_char, self.lineno);
-                    }
-                }
-                _ => {
-                    token = Token::new(tok.clone(), current_char, self.lineno);
-                }
+    pub fn next_token(&mut self) -> Token {
+        loop {
+            self.skip_whitespace();
+            let start = self.position;
+            let lineno = self.lineno;
+            if self.read_position > self.input.len() {
+                return self.token(TokenType::EOF, "".to_string(), lineno, start, start);
             }
-        } else if current_char == "\"" {
-            // string literal
-            let str = Lexer::read_literal(self);
-            token = Token::new(TokenType::STRING, str, self.lineno)
-        } else if let Some(tok) = token::DELIMITERS.get(&current_char) {
-            // delimiter
-            token = Token::new(tok.clone(), current_char, self.lineno);
-        } else {
+
+            let current_char = (self.ch as char).to_string();
+            if let Some(tok) = token::OPERATORS.get(&current_char) {
+                if *tok == TokenType::DIV && self.peek_ahead() == Some('/' as u8) {
+                    self.skip_line_comment();
+                    self.read_char();
+                    return self.token(TokenType::ILLEGAL, String::new(), lineno, start, self.position);
+                }
+
+                return match tok {
+                    TokenType::ASSIGN => self.read_assign_or_eq(start, lineno),
+                    TokenType::GT => self.read_gt_or_geq(start, lineno),
+                    TokenType::LT => self.read_lt_or_leq(start, lineno),
+                    TokenType::NOT => self.read_not_or_neq(start, lineno),
+                    TokenType::DIV => {
+                        self.read_char();
+                        self.token(TokenType::DIV, "/".to_string(), lineno, start, self.position)
+                    }
+                    _ => {
+                        let literal = current_char.clone();
+                        self.read_char();
+                        self.token(tok.clone(), literal, lineno, start, self.position)
+                    }
+                };
+            }
+
+            if current_char == "\"" {
+                let str = Lexer::read_literal(self);
+                self.read_char();
+                return self.token(TokenType::STRING, str, lineno, start, self.position);
+            }
+
+            if let Some(tok) = token::DELIMITERS.get(&current_char) {
+                self.read_char();
+                return self.token(tok.clone(), current_char, lineno, start, self.position);
+            }
+
             if Lexer::is_letter(self.ch) {
-                // identifier
                 let literal = Lexer::read_identifier(self, Lexer::is_letter);
                 let tok = Token::check_keyword(&literal);
-                token = Token::new(tok, literal, self.lineno);
-                return token;
-            } else if Lexer::is_number(self.ch) {
-                // number literal
-                let literal = Lexer::read_identifier(self, Lexer::is_number);
-                token = Token::new(TokenType::NUM, literal, self.lineno);
-                return token;
-            } else {
-                panic!("illegal identifier");
+                return self.token(tok, literal, lineno, start, self.position);
             }
-        }
 
-        self.read_char();
-        token
+            if Lexer::is_number(self.ch) {
+                let literal = Lexer::read_identifier(self, Lexer::is_number);
+                return self.token(TokenType::NUM, literal, lineno, start, self.position);
+            }
+
+            panic!("illegal identifier");
+        }
+    }
+
+    fn read_assign_or_eq(&mut self, start: usize, lineno: usize) -> Token {
+        if self.peek_ahead() == Some('=' as u8) {
+            self.read_char();
+            self.read_char();
+            self.token(TokenType::EQ, "==".to_string(), lineno, start, self.position)
+        } else {
+            self.read_char();
+            self.token(TokenType::ASSIGN, "=".to_string(), lineno, start, self.position)
+        }
+    }
+
+    fn read_gt_or_geq(&mut self, start: usize, lineno: usize) -> Token {
+        if self.peek_ahead() == Some('=' as u8) {
+            self.read_char();
+            self.read_char();
+            self.token(TokenType::GEQ, ">=".to_string(), lineno, start, self.position)
+        } else {
+            self.read_char();
+            self.token(TokenType::GT, ">".to_string(), lineno, start, self.position)
+        }
+    }
+
+    fn read_lt_or_leq(&mut self, start: usize, lineno: usize) -> Token {
+        if self.peek_ahead() == Some('=' as u8) {
+            self.read_char();
+            self.read_char();
+            self.token(TokenType::LEQ, "<=".to_string(), lineno, start, self.position)
+        } else {
+            self.read_char();
+            self.token(TokenType::LT, "<".to_string(), lineno, start, self.position)
+        }
+    }
+
+    fn read_not_or_neq(&mut self, start: usize, lineno: usize) -> Token {
+        if self.peek_ahead() == Some('=' as u8) {
+            self.read_char();
+            self.read_char();
+            self.token(TokenType::NEQ, "!=".to_string(), lineno, start, self.position)
+        } else {
+            self.read_char();
+            self.token(TokenType::NOT, "!".to_string(), lineno, start, self.position)
+        }
     }
 }
 
