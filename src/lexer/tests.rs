@@ -47,6 +47,35 @@ fn test_token_next() {
 }
 
 #[test]
+fn multiline_token_lineno() {
+    let input = "fn a() {\n  return 1;\n}\n\nprint 1;".to_string();
+    let mut lexer = Lexer::new(input);
+    let mut tokens = Vec::new();
+    loop {
+        let token = lexer.next_token();
+        if token.type_ == TokenType::EOF {
+            break;
+        }
+        if token.type_ == TokenType::ILLEGAL {
+            continue;
+        }
+        tokens.push((token.literal, token.lineno));
+    }
+
+    assert_eq!(lineno_of(&tokens, "fn"), 1);
+    assert_eq!(lineno_of(&tokens, "return"), 2);
+    assert_eq!(lineno_of(&tokens, "print"), 5);
+}
+
+fn lineno_of(tokens: &[(String, usize)], literal: &str) -> usize {
+    tokens
+        .iter()
+        .find(|(lit, _)| lit == literal)
+        .map(|(_, line)| *line)
+        .unwrap_or_else(|| panic!("missing token '{literal}'"))
+}
+
+#[test]
 fn test_comments() {
     let input = "//10\n10".to_string();
     let mut lexer = Lexer::new(input);

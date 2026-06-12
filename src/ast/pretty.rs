@@ -539,6 +539,16 @@ mod tests {
     }
 
     #[test]
+    fn tree_dump_uses_correct_source_lines() {
+        let source = "fn add(a, b) {\n  return a + b;\n}\n\nprint add(1, 2);";
+        let program = parse(source).unwrap();
+        let output = dump_program(&program, DumpFormat::Tree);
+        assert!(output.contains("Decl::Function [line 1]"));
+        assert!(output.contains("Stmt::Return [line 2]"));
+        assert!(output.contains("Stmt::Print [line 5]"));
+    }
+
+    #[test]
     fn json_dump_is_valid_and_typed() {
         let program = parse("let x = 1;").unwrap();
         let output = dump_program(&program, DumpFormat::Json);

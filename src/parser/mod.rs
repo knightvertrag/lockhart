@@ -72,13 +72,17 @@ impl Parser {
         }
     }
 
+    fn span_since(&self, start: usize, line: usize) -> Span {
+        Span::new(start, self.previous.end, line)
+    }
+
     fn parse_program(&mut self) -> Result<Program, ParseError> {
         let mut declarations = Vec::new();
         while !self.check(TokenType::EOF) {
             let start = self.current.start;
+            let line = self.current.lineno;
             let decl = self.parse_declaration()?;
-            let span = Span::new(start, self.previous.end, self.previous.lineno);
-            declarations.push(Spanned::new(decl, span));
+            declarations.push(Spanned::new(decl, self.span_since(start, line)));
         }
         Ok(Program { declarations })
     }
@@ -97,6 +101,7 @@ impl Parser {
 
     fn parse_var_declaration(&mut self) -> Result<Decl, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         let name = self.parse_ident("Expected variable name")?;
         let initializer = if self.match_token(TokenType::ASSIGN) {
             Some(self.parse_expression()?)
@@ -104,18 +109,18 @@ impl Parser {
             None
         };
         self.consume(TokenType::SEMICOLON, "';' after variable declaration")?;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
         Ok(Decl::Var(Spanned::new(
             VarDecl {
                 name,
                 initializer,
             },
-            span,
+            self.span_since(start, line),
         )))
     }
 
     fn parse_function_declaration(&mut self) -> Result<Decl, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         let name = self.parse_ident("Expected function name")?;
         let saved = self.in_function;
         self.in_function = true;
@@ -123,10 +128,9 @@ impl Parser {
         self.consume(TokenType::LBRACE, "'{' before function body")?;
         let body = self.parse_block()?;
         self.in_function = saved;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
         Ok(Decl::Function(Spanned::new(
             FnDecl { name, params, body },
-            span,
+            self.span_since(start, line),
         )))
     }
 
@@ -155,9 +159,9 @@ impl Parser {
             self.parse_print_statement()
         } else if self.match_token(TokenType::LBRACE) {
             let start = self.previous.start;
+            let line = self.previous.lineno;
             let block = self.parse_block()?;
-            let span = Span::new(start, self.previous.end, self.previous.lineno);
-            Ok(Stmt::Block(Spanned::new(block, span)))
+            Ok(Stmt::Block(Spanned::new(block, self.span_since(start, line))))
         } else if self.match_token(TokenType::IF) {
             self.parse_if_statement()
         } else if self.match_token(TokenType::RETURN) {
@@ -173,22 +177,23 @@ impl Parser {
 
     fn parse_print_statement(&mut self) -> Result<Stmt, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         let expr = self.parse_expression()?;
         self.consume(TokenType::SEMICOLON, "';' after print value")?;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
-        Ok(Stmt::Print(Spanned::new(expr, span)))
+        Ok(Stmt::Print(Spanned::new(expr, self.span_since(start, line))))
     }
 
     fn parse_expression_statement(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.start;
+        let line = self.current.lineno;
         let expr = self.parse_expression()?;
         self.consume(TokenType::SEMICOLON, "';' after expression")?;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
-        Ok(Stmt::Expression(Spanned::new(expr, span)))
+        Ok(Stmt::Expression(Spanned::new(expr, self.span_since(start, line))))
     }
 
     fn parse_if_statement(&mut self) -> Result<Stmt, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         self.consume(TokenType::LPAREN, "'(' before condition")?;
         let condition = self.parse_expression()?;
         self.consume(TokenType::RPAREN, "')' after condition")?;
@@ -198,32 +203,32 @@ impl Parser {
         } else {
             None
         };
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
         Ok(Stmt::If(Spanned::new(
             IfStmt {
                 condition,
                 then_branch,
                 else_branch,
             },
-            span,
+            self.span_since(start, line),
         )))
     }
 
     fn parse_while_statement(&mut self) -> Result<Stmt, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         self.consume(TokenType::LPAREN, "'(' after 'while'")?;
         let condition = self.parse_expression()?;
         self.consume(TokenType::RPAREN, "')' after while condition")?;
         let body = Box::new(self.parse_statement()?);
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
         Ok(Stmt::While(Spanned::new(
             WhileStmt { condition, body },
-            span,
+            self.span_since(start, line),
         )))
     }
 
     fn parse_for_statement(&mut self) -> Result<Stmt, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         self.consume(TokenType::LPAREN, "'(' after 'for'")?;
 
         let initializer = if self.match_token(TokenType::SEMICOLON) {
@@ -251,7 +256,6 @@ impl Parser {
         self.consume(TokenType::RPAREN, "')' after for clauses")?;
 
         let body = Box::new(self.parse_statement()?);
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
         Ok(Stmt::For(Spanned::new(
             ForStmt {
                 initializer,
@@ -259,12 +263,13 @@ impl Parser {
                 increment,
                 body,
             },
-            span,
+            self.span_since(start, line),
         )))
     }
 
     fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
         let start = self.previous.start;
+        let line = self.previous.lineno;
         if !self.in_function {
             return Err(ParseError::ReturnOutsideFunction {
                 span: self.previous.span(),
@@ -276,17 +281,16 @@ impl Parser {
             Some(self.parse_expression()?)
         };
         self.consume(TokenType::SEMICOLON, "';' after return value")?;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
-        Ok(Stmt::Return(Spanned::new(value, span)))
+        Ok(Stmt::Return(Spanned::new(value, self.span_since(start, line))))
     }
 
     fn parse_block(&mut self) -> Result<BlockStmt, ParseError> {
         let mut declarations = Vec::new();
         while !self.check(TokenType::RBRACE) && !self.check(TokenType::EOF) {
             let start = self.current.start;
+            let line = self.current.lineno;
             let decl = self.parse_declaration()?;
-            let span = Span::new(start, self.previous.end, self.previous.lineno);
-            declarations.push(Spanned::new(decl, span));
+            declarations.push(Spanned::new(decl, self.span_since(start, line)));
         }
         self.consume(TokenType::RBRACE, "'}' after block")?;
         Ok(BlockStmt { declarations })
@@ -367,10 +371,10 @@ impl Parser {
     }
 
     fn parse_grouping_expr(&mut self, _: bool) -> Result<Expr, ParseError> {
-        let start = self.previous.start;
+        let open = self.previous.span();
         let expr = self.parse_expression()?;
         self.consume(TokenType::RPAREN, "')' after expression")?;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
+        let span = open.merge(self.previous.span());
         Ok(Expr::Grouping(Spanned::new(Box::new(expr), span)))
     }
 
@@ -466,7 +470,7 @@ impl Parser {
     }
 
     fn parse_call_expr(&mut self, _: bool, callee: Expr) -> Result<Expr, ParseError> {
-        let start = callee.span().start;
+        let callee_span = callee.span();
         let mut args = Vec::new();
         if !self.check(TokenType::RPAREN) {
             loop {
@@ -482,7 +486,7 @@ impl Parser {
             }
         }
         self.consume(TokenType::RPAREN, "')' after arguments")?;
-        let span = Span::new(start, self.previous.end, self.previous.lineno);
+        let span = callee_span.merge(self.previous.span());
         Ok(Expr::Call(Spanned::new(
             CallExpr {
                 callee: Box::new(callee),

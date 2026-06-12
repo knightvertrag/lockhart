@@ -55,9 +55,6 @@ impl Lexer {
 
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
-            if self.ch == '\n' as u8 {
-                self.lineno += 1;
-            }
             self.read_char();
         }
     }
